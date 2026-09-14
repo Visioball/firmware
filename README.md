@@ -8,7 +8,7 @@ The sound is designed to help users locate the ball and provide feedback about i
 
 ## Hardware
 
-- ESP32-WROVER-E-N16R8
-- MAX98357A audio amplifier
-- BMI260 inertial measurement unit
-- WS2813 addressable LEDs
+- ESP32-S3-ETH (N16R8: 16MB Flash, 8MB PSRAM)
+- WS2812B addressable LED strip
+- I2C bus (SDA/SCL) for future sensor/peripheral expansion
+- SPI bus for future peripheral expansion (e.g. audio amplifier, IMU)
