@@ -1,0 +1,17 @@
+# PlatformIO build artifacts, cache, and dependencies
+.pio/
+.pioenvs/
+.piolibdeps/
+.cache/
+.dummy
+
+# VS Code project/machine-specific settings and databases
+.vscode/
+compile_commands.json
+
+# OS and temporary files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.tmp
+*.bak
