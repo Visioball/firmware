@@ -15,9 +15,9 @@ void clearLedStrip() {
     FastLED.show();
 }
 
-void runLedChase(const CRGB& color, uint8_t brightness, uint8_t stepDelayMs) {
+void runLedChase(const CRGB& color, uint8_t brightness, uint8_t stepDelayMs, int increment) {
     FastLED.setBrightness(brightness);
-    for (uint16_t i = 0; i < AppConfig::Led::NUM_LEDS; ++i) {
+    for (uint16_t i = 0; i < AppConfig::Led::NUM_LEDS; i += increment) {
         FastLED.clear();
         stripLeds[i] = color;
         FastLED.show();

@@ -6,5 +6,7 @@
 void initLedStrip();
 void runLedChase(const CRGB& color = CRGB::White, 
                  uint8_t brightness = AppConfig::Led::DEFAULT_BRIGHT, 
-                 uint8_t stepDelayMs = AppConfig::Led::CHASE_DELAY_MS);
+                 uint8_t stepDelayMs = AppConfig::Led::CHASE_DELAY_MS,
+                 int increment = 1
+                );
 void clearLedStrip();

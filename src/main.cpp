@@ -28,7 +28,19 @@ void setup() {
 
 void loop() {
     updateStatusLed();
-    runLedChase(CRGB::White, AppConfig::Led::DEFAULT_BRIGHT, AppConfig::Led::CHASE_DELAY_MS);
+    for (int i = 1; i < 4; i++){
+        switch (i) {
+        case 1:
+            runLedChase(CRGB::Red, AppConfig::Led::DEFAULT_BRIGHT, AppConfig::Led::CHASE_DELAY_MS, i);
+            break;
+        case 2:
+            runLedChase(CRGB::Green, AppConfig::Led::DEFAULT_BRIGHT, AppConfig::Led::CHASE_DELAY_MS, i);
+            break;
+        case 3:
+            runLedChase(CRGB::Blue, AppConfig::Led::DEFAULT_BRIGHT, AppConfig::Led::CHASE_DELAY_MS, i);
+            break;
+        }
+    }
 }
 
 

@@ -15,7 +15,7 @@ namespace AppConfig {
         constexpr uint8_t  PIN            = 18;
         constexpr uint16_t NUM_LEDS       = 64;
         constexpr uint8_t  DEFAULT_BRIGHT = 10;
-        constexpr uint8_t  CHASE_DELAY_MS = 30;
+        constexpr uint8_t  CHASE_DELAY_MS = 100;
     }
 
     // =========================================================================
