@@ -1,20 +1,21 @@
 #pragma once
 #include <Arduino.h>
 
-// =============================================================================
-// Board & Serial Settings
-// =============================================================================
-namespace AppConfig {
-    constexpr uint32_t SERIAL_BAUD_RATE   = 115200;
-    constexpr uint32_t STARTUP_DELAY_MS   = 5000;
+    // =============================================================================
+    // Board & Serial Settings
+    // =============================================================================
+    namespace AppConfig {
+        constexpr uint32_t SERIAL_BAUD_RATE   = 115200;
+        constexpr uint32_t STARTUP_DELAY_MS   = 5000;
+
 
     // =========================================================================
     // LED Strip Configuration
     // =========================================================================
     namespace Led {
-        constexpr uint8_t  PIN            = 18;
+        constexpr uint8_t  PIN            = 17;
         constexpr uint16_t NUM_LEDS       = 64;
-        constexpr uint8_t  DEFAULT_BRIGHT = 10;
+        constexpr uint8_t  DEFAULT_BRIGHT = 5;
         constexpr uint8_t  CHASE_DELAY_MS = 100;
     }
 
@@ -85,7 +86,7 @@ namespace AppConfig {
     // =========================================================================
     namespace Diagnostics {
         constexpr uint8_t TEST_PINS[] = {
-            1, 2, 3, 15, 16, 17,
+            2, 3, 15, 16, 17,
             38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48
         };
         constexpr size_t TEST_PIN_COUNT = sizeof(TEST_PINS) / sizeof(TEST_PINS[0]);
