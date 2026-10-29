@@ -12,3 +12,8 @@ The sound is designed to help users locate the ball and provide feedback about i
 - MAX98357A audio amplifier
 - BMI260 inertial measurement unit
 - WS2813 addressable LEDs
+
+## LED input simulation
+
+The current firmware cycles through sample light JSON payloads every two seconds
+to test the 60-pixel WS2813 strip on ESP32 GPIO17. 
