@@ -1,7 +1,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <Arduino.h>
-#include <ArduinoJson.h>
-#include <cstring>
+#include <MPU9250_WE.h>
+#include <Wire.h>
 
 #include "hardware/NeoPixelOutput.h"
 #include "Ball.h"
@@ -11,14 +11,17 @@
 
 namespace {
 
-constexpr uint8_t LED_PIN = 17;
-// The strip is physically 60 pixels, but only the first 45 are lit (USB power).
-// Data must still be sent to all 60 so the unused pixels are explicitly off.
-constexpr uint16_t LED_COUNT = 60;
-constexpr uint16_t ACTIVE_LED_COUNT = 45;
-constexpr uint32_t SIMULATION_INTERVAL_MS = 3000;
+constexpr uint8_t LED_PIN = 18;
+constexpr uint16_t LED_COUNT = 18;
+constexpr uint16_t ACTIVE_LED_COUNT = 18;
+constexpr int SDA_PIN = 16;
+constexpr int SCL_PIN = 17;
+constexpr uint32_t SAMPLE_INTERVAL_MS = 250;
+constexpr uint32_t RETRY_INTERVAL_MS = 5000;
+constexpr uint8_t IMU_ADDRESSES[] = {0x68, 0x69};
+constexpr uint8_t ACCEL_OUT_REGISTER = 0x3B;
 
-Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRBW + NEO_KHZ800);
+Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 NeoPixelOutput lightOutput(strip);
 Motion motion;
 Spatial spatial(motion);
@@ -26,115 +29,85 @@ Ball ball(motion);
 Light light(lightOutput, spatial, ACTIVE_LED_COUNT);
 Sound sound(spatial);
 Solid solid(Color{});
+MPU9250_WE imuAt68(&Wire, IMU_ADDRESSES[0]);
+MPU9250_WE imuAt69(&Wire, IMU_ADDRESSES[1]);
+MPU9250_WE *const sensors[] = {&imuAt68, &imuAt69};
+uint8_t imuAddress = 0;
+bool wireReady = false;
+uint32_t lastSampleTime = 0;
+uint32_t lastAttemptTime = 0;
 
-const char *const simulatedInputs[] = {
-    R"json({"light":{"status":true,"intensity":5,"type":"static","color":{"r":255,"g":0,"b":0,"w":0}}})json",
-    R"json({"light":{"status":true,"intensity":10,"type":"static","color":{"r":255,"g":0,"b":0,"w":0}}})json",
-    R"json({"light":{"status":true,"intensity":15,"type":"static","color":{"r":255,"g":0,"b":0,"w":0}}})json",
-    R"json({"light":{"status":true,"intensity":5,"type":"static","color":{"r":0,"g":255,"b":0,"w":0}}})json",
-    R"json({"light":{"status":true,"intensity":10,"type":"static","color":{"r":0,"g":255,"b":0,"w":0}}})json",
-    R"json({"light":{"status":true,"intensity":15,"type":"static","color":{"r":0,"g":255,"b":0,"w":0}}})json",
-    R"json({"light":{"status":true,"intensity":5,"type":"static","color":{"r":0,"g":0,"b":255,"w":0}}})json",
-    R"json({"light":{"status":true,"intensity":10,"type":"static","color":{"r":0,"g":0,"b":255,"w":0}}})json",
-    R"json({"light":{"status":true,"intensity":15,"type":"static","color":{"r":0,"g":0,"b":255,"w":0}}})json",
-};
-
-size_t nextInputIndex = 0;
-uint32_t lastInputTime = 0;
-bool hasProcessedInput = false;
-
-bool readColorComponent(JsonObjectConst color, const char *key, uint8_t &value) {
-  const JsonVariantConst component = color[key];
-  if (!component.is<int>()) {
+bool readRegisters(uint8_t address, uint8_t firstRegister, uint8_t *data,
+                   size_t length) {
+  Wire.beginTransmission(address);
+  const bool registerWritten = Wire.write(firstRegister) == 1;
+  const uint8_t status = Wire.endTransmission(false);
+  if (!registerWritten || status != 0) {
     return false;
   }
-
-  const int parsedValue = component.as<int>();
-  if (parsedValue < 0 || parsedValue > 255) {
+  if (Wire.requestFrom(address, static_cast<uint8_t>(length)) != length) {
     return false;
   }
-
-  value = static_cast<uint8_t>(parsedValue);
+  for (size_t i = 0; i < length; ++i) {
+    const int value = Wire.read();
+    if (value < 0) {
+      return false;
+    }
+    data[i] = static_cast<uint8_t>(value);
+  }
   return true;
 }
 
-bool applyLightJson(const char *json) {
-  JsonDocument document;
-  const DeserializationError error = deserializeJson(document, json);
-  if (error) {
-    Serial.print("Could not parse light JSON: ");
-    Serial.println(error.c_str());
-    return false;
-  }
+bool startImu() {
+  for (size_t i = 0; i < sizeof(IMU_ADDRESSES) / sizeof(IMU_ADDRESSES[0]); ++i) {
+    uint8_t identity;
+    if (!readRegisters(IMU_ADDRESSES[i], MPU9250_WE::REGISTER_WHO_AM_I,
+                       &identity, 1) ||
+        identity != MPU9250_WE::WHO_AM_I_CODE) {
+      continue;
+    }
+    if (!sensors[i]->init()) {
+      Serial.printf("MPU9250 op 0x%02X kon niet worden geinitialiseerd.\n",
+                    IMU_ADDRESSES[i]);
+      continue;
+    }
 
-  const JsonVariantConst lightValue = document["light"];
-  if (!lightValue.is<JsonObjectConst>()) {
-    Serial.println("Light JSON is missing the light object.");
-    return false;
+    uint8_t ranges[2];
+    if (!readRegisters(IMU_ADDRESSES[i], MPU9250_WE::REGISTER_GYRO_CONFIG,
+                       ranges, sizeof(ranges)) ||
+        (ranges[0] & 0x18) != 0 || (ranges[1] & 0x18) != 0) {
+      Serial.println("MPU9250-meetbereik kon niet worden gecontroleerd.");
+      continue;
+    }
+    imuAddress = IMU_ADDRESSES[i];
+    Serial.printf("MPU9250 gevonden op 0x%02X; metingen zijn niet gekalibreerd.\n",
+                  imuAddress);
+    return true;
   }
-
-  const JsonObjectConst lightJson = lightValue.as<JsonObjectConst>();
-  const JsonVariantConst statusValue = lightJson["status"];
-  const JsonVariantConst intensityValue = lightJson["intensity"];
-  const JsonVariantConst typeValue = lightJson["type"];
-  const JsonVariantConst colorValue = lightJson["color"];
-
-  if (!statusValue.is<bool>() || !intensityValue.is<int>() ||
-      !typeValue.is<const char *>() || !colorValue.is<JsonObjectConst>()) {
-    Serial.println("Light JSON has missing or invalid fields.");
-    return false;
-  }
-
-  const int intensity = intensityValue.as<int>();
-  const char *type = typeValue.as<const char *>();
-  if (intensity < 0 || intensity > 255) {
-    Serial.println("Light intensity must be between 0 and 255.");
-    return false;
-  }
-  if (std::strcmp(type, "static") != 0) {
-    Serial.print("Unsupported light type: ");
-    Serial.println(type);
-    return false;
-  }
-
-  const JsonObjectConst color = colorValue.as<JsonObjectConst>();
-  uint8_t red;
-  uint8_t green;
-  uint8_t blue;
-  uint8_t white = 0;
-  if (!readColorComponent(color, "r", red) ||
-      !readColorComponent(color, "g", green) ||
-      !readColorComponent(color, "b", blue)) {
-    Serial.println("Light color components must be between 0 and 255.");
-    return false;
-  }
-  // "w" is optional so RGB-only payloads keep working.
-  if (!color["w"].isNull() && !readColorComponent(color, "w", white)) {
-    Serial.println("Light white component must be between 0 and 255.");
-    return false;
-  }
-
-  Color parsedColor;
-  parsedColor.red = red;
-  parsedColor.green = green;
-  parsedColor.blue = blue;
-  parsedColor.white = white;
-  solid.setColor(parsedColor);
-  light.setLevel(static_cast<uint8_t>(intensity));
-  light.setEnabled(statusValue.as<bool>());
-  if (!ball.update(light)) {
-    Serial.println("Could not update light.");
-    return false;
-  }
-  Serial.println(light.isEnabled() ? "Applied light settings."
-                                   : "Light strip off.");
-  return true;
+  Serial.println("Geen werkende MPU9250 op 0x68 of 0x69. Controleer bedrading en voeding.");
+  return false;
 }
 
-void processSimulatedInput() {
-  const size_t inputCount = sizeof(simulatedInputs) / sizeof(simulatedInputs[0]);
-  applyLightJson(simulatedInputs[nextInputIndex]);
-  nextInputIndex = (nextInputIndex + 1) % inputCount;
+int32_t signedValue(const uint8_t *data) {
+  const uint16_t value = (static_cast<uint16_t>(data[0]) << 8) | data[1];
+  return value >= 0x8000 ? static_cast<int32_t>(value) - 0x10000 : value;
+}
+
+bool printImuValues() {
+  uint8_t data[14];
+  if (!readRegisters(imuAddress, ACCEL_OUT_REGISTER, data, sizeof(data))) {
+    Serial.println("MPU9250 uitlezen mislukt; verbinding wordt opnieuw geprobeerd.");
+    return false;
+  }
+  Serial.printf("Accel (g) X: %7.3f Y: %7.3f Z: %7.3f | "
+                "Gyro (graden/s) X: %8.2f Y: %8.2f Z: %8.2f\n",
+                signedValue(&data[0]) / 16384.0f,
+                signedValue(&data[2]) / 16384.0f,
+                signedValue(&data[4]) / 16384.0f,
+                signedValue(&data[8]) / 131.072f,
+                signedValue(&data[10]) / 131.072f,
+                signedValue(&data[12]) / 131.072f);
+  return true;
 }
 
 } // namespace
@@ -145,14 +118,33 @@ void setup() {
   strip.clear();
   strip.show();
   light.setEffect(solid);
+
+  wireReady = Wire.begin(SDA_PIN, SCL_PIN);
+  if (!wireReady) {
+    Serial.println("I2C initialiseren mislukt; controleer SDA en SCL.");
+    return;
+  }
+  startImu();
+  lastAttemptTime = millis();
 }
 
 void loop() {
-  const uint32_t now = millis();
-  if (!hasProcessedInput ||
-      static_cast<uint32_t>(now - lastInputTime) >= SIMULATION_INTERVAL_MS) {
-    processSimulatedInput();
-    lastInputTime = now;
-    hasProcessedInput = true;
+  if (!wireReady) {
+    delay(1000);
+    return;
   }
+  const uint32_t now = millis();
+  if (imuAddress == 0) {
+    if (static_cast<uint32_t>(now - lastAttemptTime) >= RETRY_INTERVAL_MS) {
+      lastAttemptTime = now;
+      startImu();
+    }
+  } else if (static_cast<uint32_t>(now - lastSampleTime) >= SAMPLE_INTERVAL_MS) {
+    lastSampleTime = now;
+    if (!printImuValues()) {
+      imuAddress = 0;
+      lastAttemptTime = now;
+    }
+  }
+  delay(10);
 }
