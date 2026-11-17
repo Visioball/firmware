@@ -3,6 +3,12 @@
 #include <ArduinoJson.h>
 #include <cstring>
 
+#include "hardware/NeoPixelOutput.h"
+#include "Ball.h"
+#include "actuators/light/Light.h"
+#include "actuators/light/effects/Solid.h"
+#include "actuators/sound/Sound.h"
+
 namespace {
 
 constexpr uint8_t LED_PIN = 17;
@@ -13,6 +19,13 @@ constexpr uint16_t ACTIVE_LED_COUNT = 45;
 constexpr uint32_t SIMULATION_INTERVAL_MS = 3000;
 
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRBW + NEO_KHZ800);
+NeoPixelOutput lightOutput(strip);
+Motion motion;
+Spatial spatial(motion);
+Ball ball(motion);
+Light light(lightOutput, spatial, ACTIVE_LED_COUNT);
+Sound sound(spatial);
+Solid solid(Color{});
 
 const char *const simulatedInputs[] = {
     R"json({"light":{"status":true,"intensity":5,"type":"static","color":{"r":255,"g":0,"b":0,"w":0}}})json",
@@ -60,11 +73,11 @@ bool applyLightJson(const char *json) {
     return false;
   }
 
-  const JsonObjectConst light = lightValue.as<JsonObjectConst>();
-  const JsonVariantConst statusValue = light["status"];
-  const JsonVariantConst intensityValue = light["intensity"];
-  const JsonVariantConst typeValue = light["type"];
-  const JsonVariantConst colorValue = light["color"];
+  const JsonObjectConst lightJson = lightValue.as<JsonObjectConst>();
+  const JsonVariantConst statusValue = lightJson["status"];
+  const JsonVariantConst intensityValue = lightJson["intensity"];
+  const JsonVariantConst typeValue = lightJson["type"];
+  const JsonVariantConst colorValue = lightJson["color"];
 
   if (!statusValue.is<bool>() || !intensityValue.is<int>() ||
       !typeValue.is<const char *>() || !colorValue.is<JsonObjectConst>()) {
@@ -101,18 +114,20 @@ bool applyLightJson(const char *json) {
     return false;
   }
 
-  if (!statusValue.as<bool>()) {
-    strip.clear();
-    strip.show();
-    Serial.println("Light strip off.");
-    return true;
+  Color parsedColor;
+  parsedColor.red = red;
+  parsedColor.green = green;
+  parsedColor.blue = blue;
+  parsedColor.white = white;
+  solid.setColor(parsedColor);
+  light.setLevel(static_cast<uint8_t>(intensity));
+  light.setEnabled(statusValue.as<bool>());
+  if (!ball.update(light)) {
+    Serial.println("Could not update light.");
+    return false;
   }
-
-  strip.setBrightness(static_cast<uint8_t>(intensity));
-  strip.clear();
-  strip.fill(strip.Color(red, green, blue, white), 0, ACTIVE_LED_COUNT);
-  strip.show();
-  Serial.println("Applied light settings.");
+  Serial.println(light.isEnabled() ? "Applied light settings."
+                                   : "Light strip off.");
   return true;
 }
 
@@ -129,6 +144,7 @@ void setup() {
   strip.begin();
   strip.clear();
   strip.show();
+  light.setEffect(solid);
 }
 
 void loop() {
