@@ -10,18 +10,20 @@
 #include "motion/Spatial.h"
 
 class Light : public IActuator {
-public:
+
+  public:
   static constexpr size_t MAX_LEDS = 72;
 
-  Light(ILightOutput &output, const Spatial &spatial, size_t activeLedCount);
-  void setEffect(ILightEffect &effect);
-  bool setPosition(size_t index, const Vector3 &position);
-  bool update() override;
-
-private:
+  private:
   ILightOutput &output_;
   const Spatial &spatial_;
   ILightEffect *activeEffect_ = nullptr;
   std::array<LED, MAX_LEDS> leds_;
   size_t activeLedCount_;
+
+public:
+  Light(ILightOutput &output, const Spatial &spatial, size_t activeLedCount);
+  void setEffect(ILightEffect &effect);
+  bool setPosition(size_t index, const Vector3 &position);
+  bool update() override;
 };

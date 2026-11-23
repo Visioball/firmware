@@ -36,7 +36,9 @@ Ball ball(motion, light, sound);
 const Color lightColor{255, 0, 0, 0};
 const Color offColor{};
 HorizontalSplit horizontalSplit(lightColor, offColor);
+
 SingleLED singleLED(TEST_LED_POSITIONS, TEST_LED_COUNT, lightColor);
+
 bool showUpperHalf = true;
 uint32_t lastSampleTime = 0;
 uint32_t lastPrintTime = 0;
