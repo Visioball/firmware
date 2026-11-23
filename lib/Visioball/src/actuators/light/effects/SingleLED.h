@@ -1,0 +1,18 @@
+#pragma once
+
+#include <stddef.h>
+
+#include "common/Color.h"
+#include "common/Vector3.h"
+#include "interfaces/ILightEffect.h"
+
+class SingleLED : public ILightEffect {
+public:
+  SingleLED(const Vector3 *positions, size_t count, const Color &color);
+  bool update(LED &led, const Spatial &spatial) const override;
+
+private:
+  const Vector3 *positions_;
+  size_t count_;
+  Color color_;
+};
