@@ -6,6 +6,13 @@ The ball contains a gyroscope, electronics, rechargeable batteries, and six spea
 
 The sound is designed to help users locate the ball and provide feedback about its speed and direction of movement.
 
+## Seeed XIAO firmware
+
+The separate [Seeed XIAO ESP32S3 project](projects/seeed-xiao-esp32s3/README.md)
+uses a BMI270 sensor and includes sound and BLE functionality. Run its
+PlatformIO commands from `projects\seeed-xiao-esp32s3`. The root project
+remains the ESP32-S3 DevKit and MPU9250 firmware described below.
+
 ## Hardware
 
 - ESP32-WROVER-E-N16R8
