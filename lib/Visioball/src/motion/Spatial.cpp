@@ -1,11 +1,11 @@
 #include "Spatial.h"
 
-Spatial::Spatial(const Motion &motion) : motion_(motion) {}
+Spatial::Spatial(const Orientation &orientation) : orientation_(orientation) {}
 
 bool Spatial::getWorldPosition(const Vector3 &position,
                                Vector3 &worldPosition) const {
   Quaternion q;
-  if (!motion_.getOrientation(q)) {
+  if (!orientation_.getOrientation(q)) {
     return false;
   }
 

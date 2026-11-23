@@ -1,18 +1,21 @@
 #pragma once
 
-#include "common/Quaternion.h"
-#include "common/Vector3.h"
+#include "motion/IMotionSensor.h"
+#include "motion/Orientation.h"
 
 class Motion {
-public:
-  // The IMU and orientation calculation have not been connected yet.
-  bool begin();
-  bool update();
-  bool getOrientation(Quaternion &orientation) const;
-
 private:
+  IMotionSensor &sensor_;
   Vector3 gyroscope_;
   Vector3 acceleration_;
-  Quaternion orientation_;
-  bool hasOrientation_ = false;
+  Orientation &orientation_;
+
+public:
+  Motion(IMotionSensor &sensor, Orientation &orientation);
+
+  bool begin();
+  bool update();
+
+  const Vector3 &getAccelerationValue() const;
+  const Vector3 &getGyroscopeValue() const;
 };

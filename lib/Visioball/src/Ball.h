@@ -1,14 +1,19 @@
 #pragma once
 
-#include "interfaces/IActuator.h"
+#include "actuators/light/Light.h"
+#include "actuators/sound/Sound.h"
 #include "motion/Motion.h"
 
 class Ball {
-public:
-  explicit Ball(Motion &motion);
-  bool update(IActuator &actuator);
-  Motion &motion();
-
 private:
   Motion &motion_;
+  Light &light_;
+  Sound &sound_;
+
+public:
+  Ball(Motion &motion, Light &light, Sound &sound);
+
+  bool begin();
+  bool update();
+  Motion &motion();
 };

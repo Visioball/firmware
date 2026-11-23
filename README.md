@@ -25,60 +25,59 @@ The sound is designed to help users locate the ball and provide feedback about i
   Each class or value type has its own header; classes with nontrivial
   behavior also have a `.cpp` file. Includes use paths relative to
   `lib/Visioball/src/` when referring to a different folder.
-- `src/hardware/`: adapters for physical devices. `NeoPixelOutput` implements
-  the model's light-output interface using Adafruit NeoPixel.
-- `src/main.cpp`: Arduino setup, construction of objects, MPU9250 sampling and
-  motion-driven light controls. It owns the objects referenced by the model.
+- `src/hardware/`: adapters for physical devices. `MPU9250Sensor` reads the
+  IMU, and `NeoPixelOutput` implements the light-output interface.
+- `src/main.cpp`: initializes the hardware and connects a shared `Orientation`
+  to `Motion` and `Spatial`, and `Motion`, `Light`, and `Sound` to `Ball`.
 - `test/architecture/`: hardware-independent C++ checks with a fake output.
 
-The diagram's light model holds up to **72 LEDs**, and sound holds six
-speakers. The current test setup is configured for 18 SK6812MINI-E RGB LEDs
-on GPIO18, connected in one chain. `LavaGlow` maps accumulated gyro rotation
-around X to brightness, Y to color (red to yellow), and Z to animation speed.
-These settings stay latched while the ball is still and can be adjusted by
-rotating back the other way. A 1.5 degrees-per-second dead zone suppresses
-gyro noise. LED output is capped at 96/255 brightness. The glow continues
-animating at its slowest speed while stationary. Sensor samples are read at
-50 Hz, and the strip is refreshed at 40 Hz. Confirm the pin, power supply and
-wiring before connecting the LEDs. The previous simulated JSON input and its
-parser have been removed.
+`Ball` holds references to `Motion`, `Light`, and `Sound`. Its `update()` reads
+motion and then updates both actuators. `Light` contains up to **72 LEDs**, and
+`Sound` contains six speakers. Both are disabled by default; the firmware
+initializes the 18-LED strip and clears it when updating the disabled light.
+The sensor readout remains the active functionality.
 
 ## MPU9250 test
 
 Connect MPU9250 SDA to GPIO16 and SCL to GPIO17, with suitable power, common
-ground and I²C pull-up resistors. Open the serial monitor at 115200 baud. The
-firmware checks I²C addresses 0x68 and 0x69 and prints acceleration (g) and
-bias-corrected angular velocity (degrees per second) for X, Y and Z every
-250 ms. Keep the sensor stationary for the one-second gyro calibration at
-startup and after reconnect. The gyro rates, with their offsets removed, are
-integrated into latched light controls; acceleration is printed for reference
-and includes gravity. Axes are relative to the sensor. If the sensor is
-unavailable or reading fails, an error is printed and initialization is
-retried every five seconds. If the I²C bus itself cannot be initialized, an
-error is printed and a restart is required; the light continues its idle
-animation.
+ground and I²C pull-up resistors. The firmware expects the sensor at I²C
+address 0x68. The firmware samples the IMU approximately every 10 ms and prints
+acceleration (g), gyroscope rotation rate (degrees per second), normalized
+acceleration direction, and orientation quaternion every 250 ms at 115200
+baud. Keep the ball still when starting to initialize its orientation.
+`Motion` uses `Orientation` to integrate gyro rates and correct tilt using
+acceleration near 1 g. `Spatial` reads the same `Orientation` for position
+calculations. The quaternion rotates sensor-local coordinates to
+world coordinates, where Z points up. Mount the sensor axes to match the
+local coordinates used for LEDs and speakers.
+
+This is a basic estimate, not a compass: yaw is arbitrary at startup and
+drifts without a magnetometer. Acceleration during motion can also disturb the
+tilt estimate. Orientation is unavailable until a usable acceleration sample
+arrives, and is reinitialized after a sampling gap over 250 ms. Initialization
+failure is reported over serial and stops sensor sampling. The existing
+sensor adapter does not yet detect failed reads.
 `Serial` uses the ESP32-S3 USB-Serial/JTAG connection via the build flags in
 `platformio.ini`. Close the serial monitor before uploading new firmware.
 
 ## What remains to implement
 
-- `Motion` still reports failure and is not connected to the firmware's
-  MPU9250 test path. The firmware directly uses calibrated gyro rates.
-  `Spatial` requires a valid
-  unit quaternion representing local-to-world rotation and treats world Z as
-  up; confirm these coordinate conventions when implementing the sensor.
 - LED and speaker positions are unconfigured. `HorizontalSplit` returns
   failure until both LED positions and motion orientation are available.
+- The MPU9250 adapter needs reliable I2C read failure reporting. Gyro bias
+  calibration and more robust sensor fusion are not implemented.
 - The four sound effects return failure and do not produce audio. A speaker
   driver, gain/level handling, effect implementations and a way to stop
   playback are still needed; sound is disabled by default.
 - `LightEffectType` and `SoundEffectType` are vocabulary for future selection;
   they do not yet create effects or extend the JSON protocol.
 
-Effects and output adapters are passed by reference; callers must keep them
-alive longer than the actuator using them. `update()` returns `false` when an
-effect or required data is unavailable. Callers must report or handle that
-failure instead of treating it as a successful update.
+The motion, light, and sound services must outlive the `Ball` that references
+them. The shared `Orientation` must outlive both `Motion` and `Spatial`.
+Effects and output adapters must also outlive the actuator using them.
+`update()` returns `false` when an effect or required data is unavailable.
+Callers must report or handle that failure instead of treating it as a
+successful update.
 
 ## Future architecture
 
@@ -96,7 +95,7 @@ geometry and ownership before implementing spatial effects.
 With a native C++ compiler, the model checks can be run without an ESP32:
 
 ```powershell
-g++ -std=c++11 -Ilib\Visioball\src test\architecture\main.cpp (Get-ChildItem lib\Visioball\src -Recurse -Filter *.cpp | ForEach-Object { $_.FullName }) -o architecture-tests.exe
+g++ -std=c++17 -Ilib\Visioball\src test\architecture\main.cpp (Get-ChildItem lib\Visioball\src -Recurse -Filter *.cpp | ForEach-Object { $_.FullName }) -o architecture-tests.exe
 .\architecture-tests.exe
 ```
 
