@@ -6,16 +6,12 @@
 #include "Ball.h"
 #include "actuators/light/Light.h"
 #include "actuators/light/LED.h"
+#include "actuators/light/LEDPositions.h"
 #include "actuators/light/effects/LavaGlow.h"
 #include "actuators/light/effects/HorizontalSplit.h"
 #include "actuators/light/effects/SingleLED.h"
 #include "actuators/light/effects/Solid.h"
-#include "actuators/sound/Sound.h"
-#include "actuators/sound/effects/Beep.h"
-#include "actuators/sound/effects/SoundFont.h"
-#include "actuators/sound/effects/Spotify.h"
-#include "actuators/sound/effects/Synth.h"
-#include "../../src/hardware/TestLedPositions.h"
+#include "interfaces/IActuator.h"
 
 class FakeLightOutput : public ILightOutput {
 public:
@@ -38,14 +34,15 @@ public:
   int showCount = 0;
 };
 
-class CountingSoundEffect : public ISoundEffect {
+// The firmware sound engine needs ESP32 hardware; Ball only needs IActuator.
+class FakeSoundActuator : public IActuator {
 public:
-  bool update(Speaker &speaker, const Spatial &) const override {
-    assert(speaker.id == count);
-    ++count;
-    return true;
+  bool update() override {
+    ++updateCount;
+    return succeeds;
   }
-  mutable size_t count = 0;
+  int updateCount = 0;
+  bool succeeds = true;
 };
 
 class FakeMotionSensor : public IMotionSensor {
@@ -78,7 +75,7 @@ int main() {
   Spatial spatial(orientationEstimate);
   FakeLightOutput output;
   Light light(output, spatial, 45);
-  Sound sound(spatial);
+  FakeSoundActuator sound;
   Ball ball(motion, light, sound);
   Color red;
   red.red = 255;
@@ -182,45 +179,33 @@ int main() {
   assert(!tooMany.update());
 
   assert(sound.update());
-  sound.setEnabled(true);
+  sound.succeeds = false;
   assert(!sound.update());
-  assert(sound.setPosition(5, position));
-  assert(!sound.setPosition(6, position));
-  CountingSoundEffect counting;
-  sound.setEffect(counting);
-  assert(sound.update());
-  assert(counting.count == 6);
+  sound.succeeds = true;
 
-  Beep beep;
-  Synth synth;
-  SoundFont soundFont;
-  Spotify spotify;
-  ISoundEffect *unimplemented[] = {&beep, &synth, &soundFont, &spotify};
-  for (ISoundEffect *effect : unimplemented) {
-    sound.setEffect(*effect);
-    assert(!sound.update());
-  }
-
-  counting.count = 0;
-  sound.setEffect(counting);
+  sound.updateCount = 0;
   light.setEffect(solid);
   light.setEnabled(true);
   const int previousShows = output.showCount;
   assert(ball.update());
   assert(output.showCount == previousShows + 1);
-  assert(counting.count == 6);
+  assert(sound.updateCount == 1);
 
-  counting.count = 0;
+  sound.succeeds = false;
+  assert(!ball.update());
+  sound.succeeds = true;
+
+  sound.updateCount = 0;
   light.setEffect(split);
   assert(!ball.update());
-  assert(counting.count == 6);
+  assert(sound.updateCount == 1);
 
   sensor.readSucceeds = false;
-  counting.count = 0;
+  sound.updateCount = 0;
   const int showsBeforeFailedRead = output.showCount;
   assert(!ball.update());
   assert(output.showCount == showsBeforeFailedRead);
-  assert(counting.count == 0);
+  assert(sound.updateCount == 0);
   assert(!orientationEstimate.getOrientation(orientation));
 
   FakeMotionSensor orientationSensor;
@@ -309,11 +294,11 @@ int main() {
   Motion mappedMotion(mappedSensor, mappedOrientation);
   Spatial mappedSpatial(mappedOrientation);
   FakeLightOutput mappedOutput;
-  Light mappedLight(mappedOutput, mappedSpatial, TEST_LED_COUNT);
-  SingleLED singleLED(TEST_LED_POSITIONS, TEST_LED_COUNT, red);
+  Light mappedLight(mappedOutput, mappedSpatial, LED_POSITION_COUNT);
+  SingleLED singleLED(LED_POSITIONS, LED_POSITION_COUNT, red);
   HorizontalSplit mappedSplit(red, Color{});
-  for (size_t i = 0; i < TEST_LED_COUNT; ++i) {
-    assert(mappedLight.setPosition(i, TEST_LED_POSITIONS[i]));
+  for (size_t i = 0; i < LED_POSITION_COUNT; ++i) {
+    assert(mappedLight.setPosition(i, LED_POSITIONS[i]));
   }
   mappedLight.setEffect(singleLED);
   mappedLight.setEnabled(true);
@@ -324,13 +309,13 @@ int main() {
   assert(mappedMotion.update());
   mappedLight.setEffect(mappedSplit);
   assert(mappedLight.update());
-  for (size_t i = 0; i < TEST_LED_COUNT; ++i) {
+  for (size_t i = 0; i < LED_POSITION_COUNT; ++i) {
     assert(mappedOutput.pixels[i].red == (i >= 9 ? 255 : 0));
   }
 
   mappedLight.setEffect(singleLED);
   assert(mappedLight.update());
-  for (size_t i = 0; i < TEST_LED_COUNT; ++i) {
+  for (size_t i = 0; i < LED_POSITION_COUNT; ++i) {
     assert(mappedOutput.pixels[i].red == (i == 9 ? 255 : 0));
   }
 
@@ -340,7 +325,7 @@ int main() {
     assert(mappedMotion.update());
   }
   assert(mappedLight.update());
-  for (size_t i = 0; i < TEST_LED_COUNT; ++i) {
+  for (size_t i = 0; i < LED_POSITION_COUNT; ++i) {
     assert(mappedOutput.pixels[i].red == (i == 14 ? 255 : 0));
   }
 
@@ -350,7 +335,7 @@ int main() {
   assert(mappedMotion.begin());
   assert(mappedMotion.update());
   assert(mappedLight.update());
-  for (size_t i = 0; i < TEST_LED_COUNT; ++i) {
+  for (size_t i = 0; i < LED_POSITION_COUNT; ++i) {
     assert(mappedOutput.pixels[i].red == (i == 12 ? 255 : 0));
   }
 
@@ -360,7 +345,7 @@ int main() {
   assert(mappedMotion.update());
   mappedLight.setEffect(mappedSplit);
   assert(mappedLight.update());
-  for (size_t i = 0; i < TEST_LED_COUNT; ++i) {
+  for (size_t i = 0; i < LED_POSITION_COUNT; ++i) {
     assert(mappedOutput.pixels[i].red == (i < 9 ? 255 : 0));
   }
 }
