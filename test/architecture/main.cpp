@@ -8,12 +8,14 @@
 #include "actuators/light/LED.h"
 #include "actuators/light/effects/LavaGlow.h"
 #include "actuators/light/effects/HorizontalSplit.h"
+#include "actuators/light/effects/SingleLED.h"
 #include "actuators/light/effects/Solid.h"
 #include "actuators/sound/Sound.h"
 #include "actuators/sound/effects/Beep.h"
 #include "actuators/sound/effects/SoundFont.h"
 #include "actuators/sound/effects/Spotify.h"
 #include "actuators/sound/effects/Synth.h"
+#include "../../src/hardware/TestLedPositions.h"
 
 class FakeLightOutput : public ILightOutput {
 public:
@@ -297,4 +299,68 @@ int main() {
       std::numeric_limits<float>::quiet_NaN();
   assert(orientationMotion.update());
   assert(!orientationEstimate2.getOrientation(orientation));
+
+  FakeMotionSensor mappedSensor;
+  mappedSensor.nextSample.acceleration.x = 0.0f;
+  mappedSensor.nextSample.acceleration.y = 0.0f;
+  mappedSensor.nextSample.acceleration.z = 1.0f;
+  mappedSensor.nextSample.gyroscope = Vector3{};
+  Orientation mappedOrientation;
+  Motion mappedMotion(mappedSensor, mappedOrientation);
+  Spatial mappedSpatial(mappedOrientation);
+  FakeLightOutput mappedOutput;
+  Light mappedLight(mappedOutput, mappedSpatial, TEST_LED_COUNT);
+  SingleLED singleLED(TEST_LED_POSITIONS, TEST_LED_COUNT, red);
+  HorizontalSplit mappedSplit(red, Color{});
+  for (size_t i = 0; i < TEST_LED_COUNT; ++i) {
+    assert(mappedLight.setPosition(i, TEST_LED_POSITIONS[i]));
+  }
+  mappedLight.setEffect(singleLED);
+  mappedLight.setEnabled(true);
+  assert(!mappedLight.update());
+  assert(mappedOutput.showCount == 0);
+
+  assert(mappedMotion.begin());
+  assert(mappedMotion.update());
+  mappedLight.setEffect(mappedSplit);
+  assert(mappedLight.update());
+  for (size_t i = 0; i < TEST_LED_COUNT; ++i) {
+    assert(mappedOutput.pixels[i].red == (i >= 9 ? 255 : 0));
+  }
+
+  mappedLight.setEffect(singleLED);
+  assert(mappedLight.update());
+  for (size_t i = 0; i < TEST_LED_COUNT; ++i) {
+    assert(mappedOutput.pixels[i].red == (i == 9 ? 255 : 0));
+  }
+
+  mappedSensor.nextSample.acceleration.z = 2.0f;
+  mappedSensor.nextSample.gyroscope.x = 80.0f;
+  for (int i = 0; i < 100; ++i) {
+    assert(mappedMotion.update());
+  }
+  assert(mappedLight.update());
+  for (size_t i = 0; i < TEST_LED_COUNT; ++i) {
+    assert(mappedOutput.pixels[i].red == (i == 14 ? 255 : 0));
+  }
+
+  mappedSensor.nextSample.gyroscope.x = 0.0f;
+  mappedSensor.nextSample.acceleration.x = 0.8660254f;
+  mappedSensor.nextSample.acceleration.z = 0.5f;
+  assert(mappedMotion.begin());
+  assert(mappedMotion.update());
+  assert(mappedLight.update());
+  for (size_t i = 0; i < TEST_LED_COUNT; ++i) {
+    assert(mappedOutput.pixels[i].red == (i == 12 ? 255 : 0));
+  }
+
+  mappedSensor.nextSample.acceleration.x = 0.0f;
+  mappedSensor.nextSample.acceleration.z = -1.0f;
+  assert(mappedMotion.begin());
+  assert(mappedMotion.update());
+  mappedLight.setEffect(mappedSplit);
+  assert(mappedLight.update());
+  for (size_t i = 0; i < TEST_LED_COUNT; ++i) {
+    assert(mappedOutput.pixels[i].red == (i < 9 ? 255 : 0));
+  }
 }

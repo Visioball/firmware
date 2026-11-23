@@ -3,5 +3,6 @@
 enum class LightEffectType { 
     HorizontalSplit, 
     Solid, 
-    LavaGlow 
+    LavaGlow,
+    SingleLED
 };

@@ -33,9 +33,21 @@ The sound is designed to help users locate the ball and provide feedback about i
 
 `Ball` holds references to `Motion`, `Light`, and `Sound`. Its `update()` reads
 motion and then updates both actuators. `Light` contains up to **72 LEDs**, and
-`Sound` contains six speakers. Both are disabled by default; the firmware
-initializes the 18-LED strip and clears it when updating the disabled light.
-The sensor readout remains the active functionality.
+`Sound` contains six speakers. The firmware configures the 18-LED test setup
+on GPIO18 and lights LEDs in red at 96/255 brightness. It starts with
+`HorizontalSplit` (upper half on) and alternates every ten seconds with
+`SingleLED` (the highest LED on). Sound remains disabled.
+When LEDs are tied for highest, `SingleLED` uses the lowest numbered LED.
+Rotation around the vertical axis alone does not change which LED is highest.
+
+The test mapping is in `src/hardware/TestLedPositions.h`. LEDs 1-9 are on the
+lower face and 10-18 are on the sensor face, following the photographed arrow
+on each face; array indices are zero-based. The nine LEDs on each triangular
+board are approximated as equally spaced around a circular ring on a sphere,
+not measured physical coordinates. Sensor axes are +Y toward the USB end, +Z
+toward the sensor face, and +X toward the right when viewing that face with
+USB at the top. Confirm the wiring order and mapping on hardware before
+relying on it.
 
 ## MPU9250 test
 
@@ -62,8 +74,8 @@ sensor adapter does not yet detect failed reads.
 
 ## What remains to implement
 
-- LED and speaker positions are unconfigured. `HorizontalSplit` returns
-  failure until both LED positions and motion orientation are available.
+- The test LED positions approximate the ball geometry; speaker positions are
+  unconfigured. Spatial light effects need a valid orientation.
 - The MPU9250 adapter needs reliable I2C read failure reporting. Gyro bias
   calibration and more robust sensor fusion are not implemented.
 - The four sound effects return failure and do not produce audio. A speaker

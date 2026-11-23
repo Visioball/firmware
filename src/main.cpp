@@ -3,20 +3,24 @@
 #include <Wire.h>
 
 #include "Ball.h"
+#include "actuators/light/effects/HorizontalSplit.h"
+#include "actuators/light/effects/SingleLED.h"
 #include "hardware/MPU9250Sensor.h"
 #include "hardware/NeoPixelOutput.h"
+#include "hardware/TestLedPositions.h"
 
 namespace {
 
 constexpr int SDA_PIN = 16;
 constexpr int SCL_PIN = 17;
 constexpr uint8_t LED_PIN = 18;
-constexpr uint16_t LED_COUNT = 18;
 constexpr uint8_t IMU_ADDRESS = 0x68;
 constexpr uint32_t SAMPLE_INTERVAL_MS = 10;
 constexpr uint32_t PRINT_INTERVAL_MS = 250;
+constexpr uint32_t EFFECT_INTERVAL_MS = 10000;
+constexpr uint8_t LED_BRIGHTNESS = 96;
 
-Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip(TEST_LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 NeoPixelOutput lightOutput(strip);
 
 MPU9250Sensor sensor(Wire, IMU_ADDRESS);
@@ -25,18 +29,26 @@ Spatial spatial(orientationEstimate);
 
 Motion motion(sensor, orientationEstimate);
 
-Light light(lightOutput, spatial, LED_COUNT);
+Light light(lightOutput, spatial, TEST_LED_COUNT);
 Sound sound(spatial);
 Ball ball(motion, light, sound);
 
+const Color lightColor{255, 0, 0, 0};
+const Color offColor{};
+HorizontalSplit horizontalSplit(lightColor, offColor);
+SingleLED singleLED(TEST_LED_POSITIONS, TEST_LED_COUNT, lightColor);
+bool showUpperHalf = true;
 uint32_t lastSampleTime = 0;
 uint32_t lastPrintTime = 0;
+uint32_t lastEffectTime = 0;
 
 } // namespace
 
 void setup() {
   Serial.begin(115200);
   strip.begin();
+  strip.clear();
+  strip.show();
   Wire.begin(SDA_PIN, SCL_PIN);
 
   if (!ball.begin()) {
@@ -46,9 +58,23 @@ void setup() {
     }
   }
 
+  for (size_t i = 0; i < TEST_LED_COUNT; ++i) {
+    if (!light.setPosition(i, TEST_LED_POSITIONS[i])) {
+      Serial.println("LED position configuration failed.");
+      while (true) {
+        delay(1000);
+      }
+    }
+  }
+  light.setEffect(horizontalSplit);
+  light.setLevel(LED_BRIGHTNESS);
+  light.setEnabled(true);
+
   Serial.println("MPU9250 ready.");
+  Serial.println("Light effect: HorizontalSplit.");
   lastSampleTime = millis();
   lastPrintTime = lastSampleTime;
+  lastEffectTime = lastSampleTime;
 }
 
 
@@ -62,8 +88,22 @@ void loop() {
   }
   lastSampleTime = now;
 
+  if (static_cast<uint32_t>(now - lastEffectTime) >= EFFECT_INTERVAL_MS) {
+    lastEffectTime = now;
+    showUpperHalf = !showUpperHalf;
+    if (showUpperHalf) {
+      light.setEffect(horizontalSplit);
+      Serial.println("Light effect: HorizontalSplit.");
+    } else {
+      light.setEffect(singleLED);
+      Serial.println("Light effect: SingleLED.");
+    }
+  }
+
   if (!ball.update()) {
     Serial.println("Ball update failed.");
+    strip.clear();
+    strip.show();
     delay(PRINT_INTERVAL_MS);
     return;
   }
