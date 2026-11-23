@@ -1,3 +1,7 @@
 #pragma once
 
-enum class LightEffectType { HorizontalSplit, Solid };
+enum class LightEffectType { 
+    HorizontalSplit, 
+    Solid, 
+    LavaGlow 
+};

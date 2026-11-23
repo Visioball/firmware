@@ -3,6 +3,8 @@
 
 #include "Ball.h"
 #include "actuators/light/Light.h"
+#include "actuators/light/LED.h"
+#include "actuators/light/effects/LavaGlow.h"
 #include "actuators/light/effects/HorizontalSplit.h"
 #include "actuators/light/effects/Solid.h"
 #include "actuators/sound/Sound.h"
@@ -60,6 +62,47 @@ int main() {
   Vector3 position;
   Vector3 world;
   assert(!spatial.getWorldPosition(position, world));
+
+  LavaGlow lavaGlow;
+  LED lavaPixel;
+  lavaGlow.setControls(0.0f, -90.0f, 0.0f, 500);
+  assert(lavaGlow.update(lavaPixel, spatial));
+  const Color redGlow = lavaPixel.color;
+  assert(redGlow.red > 0 && redGlow.green == 0 && redGlow.blue == 0);
+
+  lavaGlow.setControls(0.0f, 90.0f, 0.0f, 500);
+  assert(lavaGlow.update(lavaPixel, spatial));
+  assert(lavaPixel.color.red > 0 && lavaPixel.color.green > 0);
+
+  lavaGlow.setControls(-90.0f, 0.0f, 0.0f, 500);
+  assert(lavaGlow.update(lavaPixel, spatial));
+  const unsigned int lowIntensity =
+      lavaPixel.color.red + lavaPixel.color.green + lavaPixel.color.blue;
+  lavaGlow.setControls(90.0f, 0.0f, 0.0f, 500);
+  assert(lavaGlow.update(lavaPixel, spatial));
+  const unsigned int highIntensity =
+      lavaPixel.color.red + lavaPixel.color.green + lavaPixel.color.blue;
+  assert(lowIntensity > 0 && highIntensity > lowIntensity);
+
+  lavaGlow.setControls(0.0f, 0.0f, 0.0f, 0);
+  assert(lavaGlow.update(lavaPixel, spatial));
+  const unsigned int firstGlow =
+      lavaPixel.color.red + lavaPixel.color.green + lavaPixel.color.blue;
+  lavaGlow.setControls(0.0f, 0.0f, 0.0f, 1000);
+  assert(lavaGlow.update(lavaPixel, spatial));
+  const unsigned int laterGlow =
+      lavaPixel.color.red + lavaPixel.color.green + lavaPixel.color.blue;
+  assert(firstGlow != laterGlow);
+
+  lavaGlow.setControls(0.0f, 0.0f, 0.0f, 500);
+  assert(lavaGlow.update(lavaPixel, spatial));
+  const unsigned int slowGlow =
+      lavaPixel.color.red + lavaPixel.color.green + lavaPixel.color.blue;
+  lavaGlow.setControls(0.0f, 0.0f, 90.0f, 500);
+  assert(lavaGlow.update(lavaPixel, spatial));
+  const unsigned int fastGlow =
+      lavaPixel.color.red + lavaPixel.color.green + lavaPixel.color.blue;
+  assert(slowGlow != fastGlow);
 
   assert(ball.update(light));
   assert(output.showCount == 1);
