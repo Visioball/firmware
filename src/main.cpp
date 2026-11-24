@@ -3,6 +3,7 @@
 
 #include "Ball.h"
 #include "actuators/light/LEDPositions.h"
+#include "actuators/light/LightSettings.h"
 #include "actuators/light/NeoPixelOutput.h"
 #include "actuators/light/effects/HorizontalSplit.h"
 #include "actuators/light/effects/SingleLED.h"
@@ -11,7 +12,6 @@
 #include <LittleFS.h>
 #include <esp_system.h>
 #include <esp_timer.h>
-#include "actuators/light/LightSettings.h"
 #include "actuators/sound/I2sOutput.h"
 #include "actuators/sound/Sound.h"
 #include "configuration/config.h"
@@ -26,7 +26,6 @@
 
 namespace {
 constexpr uint32_t EFFECT_INTERVAL_MS = 10000;
-constexpr uint8_t LED_BRIGHTNESS = 96;
 
 #ifdef VISIOBALL_BMI270
 constexpr uint8_t LED_PIN = Config::Pins::LED_DATA;
@@ -47,6 +46,7 @@ Orientation orientationEstimate;
 Spatial spatial(orientationEstimate);
 Motion motion(sensor, orientationEstimate);
 Light light(lightOutput, spatial, LED_POSITION_COUNT);
+LightSettings lightSettings;
 
 #ifdef VISIOBALL_BMI270
 I2sOutput audioOutput;
@@ -56,7 +56,6 @@ uint32_t lastMotionTime = 0;
 uint32_t lastHeartbeatCycleTime = 0;
 volatile uint32_t hardwareIsrCounter = 0;
 DebugLogger debug(sound, sensor, hardwareIsrCounter);
-LightSettings lightSettings;
 #else
 class DisabledAudio final : public IActuator {
 public:
@@ -72,6 +71,14 @@ HorizontalSplit horizontalSplit({255, 0, 0, 0}, {});
 SingleLED singleLED(LED_POSITIONS, LED_POSITION_COUNT, {255, 0, 0, 0});
 bool showUpperHalf = true;
 uint32_t lastEffectTime = 0;
+
+void applyLightSettings() {
+  light.setEnabled(lightSettings.enabled);
+  light.setLevel(lightSettings.intensity);
+  const Color color{lightSettings.red, lightSettings.green, lightSettings.blue, 0};
+  horizontalSplit.setTopColor(color);
+  singleLED.setColor(color);
+}
 
 void updateLightDemo(uint32_t now) {
   if (static_cast<uint32_t>(now - lastEffectTime) < EFFECT_INTERVAL_MS) return;
@@ -130,11 +137,7 @@ void applyReceivedConfiguration() {
       lightSettings.blue = update.light.blue;
     }
     if (update.hasLightStatus || update.hasLightIntensity || update.hasLightColor) {
-      light.setEnabled(lightSettings.enabled);
-      light.setLevel(lightSettings.intensity);
-      const Color color{lightSettings.red, lightSettings.green, lightSettings.blue, 0};
-      horizontalSplit.setTopColor(color);
-      singleLED.setColor(color);
+      applyLightSettings();
     }
   }
 }
@@ -206,8 +209,7 @@ void setup() {
     }
   }
   light.setEffect(horizontalSplit);
-  light.setLevel(LED_BRIGHTNESS);
-  light.setEnabled(true);
+  applyLightSettings();
   Serial.println("Light effect: HorizontalSplit.");
   lastEffectTime = millis();
 
