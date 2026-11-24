@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#include "spatial/Vector3.h"
+#include "motion/spatial/Vector3.h"
 
 struct MotionSample {
   // Sensor-local acceleration in g and angular velocity in degrees per second.

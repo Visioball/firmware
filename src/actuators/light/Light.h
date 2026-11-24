@@ -7,7 +7,7 @@
 #include "interfaces/ILightEffect.h"
 #include "interfaces/ILightOutput.h"
 #include "LED.h"
-#include "spatial/Spatial.h"
+#include "motion/spatial/Spatial.h"
 
 class Light : public IActuator {
 

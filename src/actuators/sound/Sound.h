@@ -8,7 +8,7 @@
 #include "SoundFont.h"
 #include "WavDSP.h"
 #include "Beep.h"
-#include "ISoundOutput.h"
+#include "interfaces/ISoundOutput.h"
 #include "../../configuration/config.h"
 #include "../../interfaces/IActuator.h"
 

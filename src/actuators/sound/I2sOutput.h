@@ -1,6 +1,6 @@
 #pragma once
 #include <driver/i2s_std.h>
-#include "ISoundOutput.h"
+#include "interfaces/ISoundOutput.h"
 
 class I2sOutput final : public ISoundOutput {
 public:

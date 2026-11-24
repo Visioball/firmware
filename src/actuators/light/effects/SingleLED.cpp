@@ -1,7 +1,7 @@
 #include "SingleLED.h"
 
 #include "actuators/light/LED.h"
-#include "spatial/Spatial.h"
+#include "motion/spatial/Spatial.h"
 
 SingleLED::SingleLED(const Vector3 *positions, size_t count, const Color &color)
     : positions_(positions), count_(count), color_(color) {}

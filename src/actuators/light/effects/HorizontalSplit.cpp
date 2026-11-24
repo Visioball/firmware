@@ -1,7 +1,7 @@
 #include "HorizontalSplit.h"
 
 #include "actuators/light/LED.h"
-#include "spatial/Spatial.h"
+#include "motion/spatial/Spatial.h"
 
 HorizontalSplit::HorizontalSplit(const Color &topColor,
                                  const Color &bottomColor)

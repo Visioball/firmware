@@ -1,7 +1,7 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
-#include "Speaker.h"
+#include "actuators/sound/Speaker.h"
 
 class ISoundOutput {
 public:

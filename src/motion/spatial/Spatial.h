@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Orientation.h"
-#include "spatial/Vector3.h"
+#include "motion/Orientation.h"
+#include "motion/spatial/Vector3.h"
 
 class Spatial {
 public:

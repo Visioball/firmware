@@ -1,7 +1,7 @@
 #pragma once
 #include <array>
 #include <cstdint>
-#include "../../spatial/Vector3.h"
+#include "motion/spatial/Vector3.h"
 
 enum class SpeakerId : uint8_t { XPositive, XNegative, YPositive, YNegative, ZPositive, ZNegative };
 

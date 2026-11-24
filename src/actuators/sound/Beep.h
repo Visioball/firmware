@@ -1,5 +1,5 @@
 #pragma once
-#include "ISoundEffect.h"
+#include "interfaces/ISoundEffect.h"
 #include <cmath>
 
 class Beep final : public ISoundEffect {

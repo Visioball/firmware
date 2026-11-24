@@ -1,7 +1,7 @@
 #pragma once
 
 #include "motion/IMotionSensor.h"
-#include "spatial/Orientation.h"
+#include "motion/Orientation.h"
 
 class Motion {
 private:

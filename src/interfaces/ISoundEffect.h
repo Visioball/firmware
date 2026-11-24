@@ -1,5 +1,5 @@
 #pragma once
-#include "SoundEffectType.h"
+#include "actuators/sound/SoundEffectType.h"
 
 class ISoundEffect {
 public:

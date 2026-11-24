@@ -53,7 +53,7 @@ The layout follows the class diagram in `docs/Klassendiagram v3.png`; the
 
 - `src/Ball.h` and `src/Ball.cpp`: the ball coordinating `Motion` and the
   `IActuator`s for light and sound.
-- `src/interfaces/`: `IActuator`, `ILightEffect` and `ILightOutput`.
+- `src/interfaces/`: `IActuator` and the light and sound effect/output interfaces.
 - `src/actuators/light/`: `Light` (72 `LED`s), `Color`, `LightEffectType`,
   the `NeoPixelOutput` adapter and the LED test mapping in
   `LEDPositions.h`; concrete effects (`Solid`, `HorizontalSplit`,
@@ -62,9 +62,9 @@ The layout follows the class diagram in `docs/Klassendiagram v3.png`; the
   `ISoundEffect` implementations `Beep`, `Synth`, `SoundFont` and `WavDSP`,
   plus the `I2sOutput` adapter. This subsystem requires the ESP32 and is
   only built for the XIAO.
-- `src/motion/`: `Motion`, the `IMotionSensor` interface with
+- `src/motion/`: `Motion`, `Orientation`, the `IMotionSensor` interface with
   `MotionSample`, and `TapDetector`.
-- `src/spatial/`: `Vector3`, `Quaternion`, `Orientation` and `Spatial`.
+- `src/motion/spatial/`: `Vector3`, `Quaternion` and `Spatial`.
 - `src/sensors/`: the `IMotionSensor` adapters `MPU9250Sensor` (DevKit)
   and `Bmi270Sensor` (XIAO).
 - `src/configuration/`, `src/connections/`, `src/debug/`: BLE JSON
@@ -153,7 +153,7 @@ hardware geometry and ownership before implementing spatial effects.
 With a native C++ compiler, the model checks can be run without an ESP32:
 
 ```powershell
-g++ -std=c++17 -Isrc test\architecture\main.cpp src\Ball.cpp src\actuators\light\Light.cpp (Get-ChildItem src\actuators\light\effects -Filter *.cpp | ForEach-Object { $_.FullName }) src\motion\Motion.cpp src\spatial\Orientation.cpp src\spatial\Spatial.cpp -o architecture-tests.exe
+g++ -std=c++17 -Isrc test\architecture\main.cpp src\Ball.cpp src\actuators\light\Light.cpp (Get-ChildItem src\actuators\light\effects -Filter *.cpp | ForEach-Object { $_.FullName }) src\motion\Motion.cpp src\motion\Orientation.cpp src\motion\spatial\Spatial.cpp -o architecture-tests.exe
 .\architecture-tests.exe
 ```
 

@@ -1,6 +1,6 @@
 #pragma once
 #include "DspComponents.h"
-#include "ISoundEffect.h"
+#include "interfaces/ISoundEffect.h"
 
 class WavDSP final : public ISoundEffect {
 public:

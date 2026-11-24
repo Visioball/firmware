@@ -2,7 +2,7 @@
 
 #include <stddef.h>
 
-#include "spatial/Vector3.h"
+#include "motion/spatial/Vector3.h"
 
 constexpr size_t LED_POSITION_COUNT = 18;
 

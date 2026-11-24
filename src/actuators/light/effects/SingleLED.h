@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 #include "actuators/light/Color.h"
-#include "spatial/Vector3.h"
+#include "motion/spatial/Vector3.h"
 #include "interfaces/ILightEffect.h"
 
 class SingleLED : public ILightEffect {

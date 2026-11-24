@@ -1,5 +1,5 @@
 #pragma once
-#include "ISoundEffect.h"
+#include "interfaces/ISoundEffect.h"
 
 class Synth final : public ISoundEffect {
 public:

@@ -5,7 +5,7 @@
 #include <esp_heap_caps.h>
 #include <LittleFS.h>
 #include "DspComponents.h"
-#include "ISoundEffect.h"
+#include "interfaces/ISoundEffect.h"
 
 #pragma pack(push, 1)
 struct SF2Phdr {
