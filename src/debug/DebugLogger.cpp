@@ -51,7 +51,7 @@ void DebugLogger::printAudioInitializationFailed() {
 
 void DebugLogger::printSoundFontStatus(int count) {
     if (count > 0) {
-        Serial.println("[SYSTEM] SoundFonts ready; use Z taps to cycle through them.");
+        Serial.println("[SYSTEM] SoundFonts ready; select via BLE or serial keys 1..9.");
     } else {
         Serial.println("[SYSTEM] WARNING: No SoundFont (.sf2) files found on LittleFS!");
     }

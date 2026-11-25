@@ -1,7 +1,7 @@
 #pragma once
 
 #include "motion/spatial/Quaternion.h"
-#include "motion/IMotionSensor.h"
+#include "interfaces/IMotionSensor.h"
 
 class Orientation {
 private:

@@ -28,10 +28,15 @@ Both boards use the same model in `src/` and the same `src/main.cpp`:
   (`-DVISIOBALL_BMI270`). Upload the audio files to LittleFS with
   `pio run -e seeed_xiao_esp32s3 -t uploadfs` before starting the firmware.
 
-Both variants use the 18-position test mapping and alternate between
-`HorizontalSplit` and `SingleLED` every ten seconds. BLE can change the
-XIAO demo's color, brightness and enabled state without changing the
-automatic effect sequence.
+The DevKit uses the 18-position test mapping; the XIAO uses the 72-position
+Fusion mapping below. Both continuously show `HorizontalSplit`, with a
+smoothstep fade only just above the horizontal boundary (world heights 0 to
++0.15 on the unit sphere). The lower half stays completely off. The number
+of LEDs in this narrow transition depends on their positions and orientation.
+BLE can change the XIAO demo's color, brightness and enabled state.
+
+Audio starts at 1% volume on every boot. Change volume and audio modes via
+BLE or serial commands; tap gesture controls are not used.
 
 The XIAO LED data pin is D5, the BMI270 uses SPI and INT1, and I2S uses
 BCK D1, WS D0 and DATA D2. See `src/configuration/config.h` for pin
@@ -40,11 +45,22 @@ definitions; the BLE JSON protocol is implemented in
 The audio output duplicates mono over I2S stereo; it is not a
 six-channel driver.
 
+The XIAO build addresses 72 LEDs as one string. Its position array contains
+Fusion LED lens centers projected onto a unit sphere, in BMI270 sensor axes:
++X points toward the ESP and +Z toward top PCB 4. Indices 0-35 correspond to
+B01-B36 and indices 36-71 to T01-T36. Confirm the sensor orientation and LED
+wiring on hardware. With one 72-LED string, `SingleLED` selects one LED across
+the whole array; separate
+per-string effect evaluation will be needed when switching to two strings.
+Power the LED strip from a separate 5 V supply and connect its ground to XIAO
+ground.
+
 ## Hardware
 
 - ESP32-S3-DevKitC-1-N16R2 with MPU9250 over I²C (test setup)
 - Seeed XIAO ESP32S3 with BMI270 over SPI and I2S audio (test setup)
-- 18 SK6812MINI-E addressable LEDs (test setup)
+- 18 SK6812MINI-E addressable LEDs (DevKit test setup); the XIAO build supports
+  72 LEDs in a 2-by-36 arrangement
 
 ## Structure
 
@@ -62,8 +78,8 @@ The layout follows the class diagram in `docs/Klassendiagram v3.png`; the
   `ISoundEffect` implementations `Beep`, `Synth`, `SoundFont` and `WavDSP`,
   plus the `I2sOutput` adapter. This subsystem requires the ESP32 and is
   only built for the XIAO.
-- `src/motion/`: `Motion`, `Orientation`, the `IMotionSensor` interface with
-  `MotionSample`, and `TapDetector`.
+- `src/motion/`: `Motion` and `Orientation`, using the `IMotionSensor`
+  interface and `MotionSample`.
 - `src/motion/spatial/`: `Vector3`, `Quaternion` and `Spatial`.
 - `src/sensors/`: the `IMotionSensor` adapters `MPU9250Sensor` (DevKit)
   and `Bmi270Sensor` (XIAO).
@@ -81,7 +97,7 @@ board-specific dependencies.
 
 `Ball` holds references to `Motion`, `Light`, and the sound `IActuator`. Its
 `update()` reads motion and then updates both actuators. `Light` contains up
-to **72 LEDs**, and `Sound` contains six speakers. The firmware configures
+to **72 LEDs**, and `Sound` contains six speakers. The DevKit firmware configures
 the 18-LED test setup and lights LEDs in red at 96/255 brightness. It starts
 with `HorizontalSplit` (upper half on) and alternates every ten seconds with
 `SingleLED` (the highest LED on). On the DevKit sound remains disabled.

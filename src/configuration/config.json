@@ -16,7 +16,7 @@
     }
   },
   "sound": {
-    "defaultVolume": 5,
+    "defaultVolume": 1,
     "maxVolume": 100,
     "defaultBlockSize": 128,
     "sampleRate": 44100,

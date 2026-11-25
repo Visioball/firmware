@@ -1,7 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <SparkFun_BMI270_Arduino_Library.h>
-#include "motion/IMotionSensor.h"
+#include "interfaces/IMotionSensor.h"
 
 struct Bmi270AudioSample {
     float angularSpeed = 0.0f;

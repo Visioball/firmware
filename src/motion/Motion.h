@@ -1,6 +1,6 @@
 #pragma once
 
-#include "motion/IMotionSensor.h"
+#include "interfaces/IMotionSensor.h"
 #include "motion/Orientation.h"
 
 class Motion {

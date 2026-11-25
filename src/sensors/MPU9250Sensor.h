@@ -3,7 +3,7 @@
 #include <MPU9250_WE.h>
 #include <Wire.h>
 
-#include "motion/IMotionSensor.h"
+#include "interfaces/IMotionSensor.h"
 
 class MPU9250Sensor : public IMotionSensor {
 public:

@@ -59,8 +59,6 @@ public:
     float getMasterVolume() const;
     void updateMotion(float movement, float roll, float pitch);
     void triggerHeartbeat(float intensity = 0.5f);
-    void onTapZ();
-    void onTapX(int direction);
     bool update() override;
     void setEnabled(bool enabled) override { this->enabled = enabled; }
 
@@ -87,10 +85,6 @@ private:
     std::atomic<int> currentBlockSize;
     float* blockBuffer;
     std::atomic<SoundEffectType> currentMode;
-    int tapCycleIndex = -1;
-    int pendingTapCycleIndex = -1;
-    bool tapTransitionPending = false;
-    uint32_t tapTransitionStartedAt = 0;
     std::atomic<float> masterVolume;
     std::atomic<bool> enabled{true};
 

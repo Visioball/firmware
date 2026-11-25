@@ -6,7 +6,6 @@
 #include "actuators/light/LightSettings.h"
 #include "actuators/light/NeoPixelOutput.h"
 #include "actuators/light/effects/HorizontalSplit.h"
-#include "actuators/light/effects/SingleLED.h"
 
 #ifdef VISIOBALL_BMI270
 #include <LittleFS.h>
@@ -17,7 +16,6 @@
 #include "configuration/config.h"
 #include "connections/ble.h"
 #include "debug/DebugLogger.h"
-#include "motion/TapDetector.h"
 #include "sensors/Bmi270Sensor.h"
 #else
 #include <Wire.h>
@@ -25,10 +23,10 @@
 #endif
 
 namespace {
-constexpr uint32_t EFFECT_INTERVAL_MS = 10000;
-
 #ifdef VISIOBALL_BMI270
 constexpr uint8_t LED_PIN = Config::Pins::LED_DATA;
+constexpr size_t ACTIVE_LED_COUNT = XIAO_LED_POSITION_COUNT;
+const Vector3 *const ACTIVE_LED_POSITIONS = LED_POSITIONS_XIAO;
 Bmi270Sensor sensor;
 #else
 constexpr int SDA_PIN = 16;
@@ -37,21 +35,22 @@ constexpr uint8_t LED_PIN = 18;
 constexpr uint8_t IMU_ADDRESS = 0x68;
 constexpr uint32_t SAMPLE_INTERVAL_MS = 10;
 constexpr uint32_t PRINT_INTERVAL_MS = 250;
+constexpr size_t ACTIVE_LED_COUNT = LED_POSITION_COUNT;
+const Vector3 *const ACTIVE_LED_POSITIONS = LED_POSITIONS;
 MPU9250Sensor sensor(Wire, IMU_ADDRESS);
 #endif
 
-Adafruit_NeoPixel strip(LED_POSITION_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip(ACTIVE_LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 NeoPixelOutput lightOutput(strip);
 Orientation orientationEstimate;
 Spatial spatial(orientationEstimate);
 Motion motion(sensor, orientationEstimate);
-Light light(lightOutput, spatial, LED_POSITION_COUNT);
+Light light(lightOutput, spatial, ACTIVE_LED_COUNT);
 LightSettings lightSettings;
 
 #ifdef VISIOBALL_BMI270
 I2sOutput audioOutput;
 Sound sound(audioOutput);
-TapDetector tapDetector;
 uint32_t lastMotionTime = 0;
 uint32_t lastHeartbeatCycleTime = 0;
 volatile uint32_t hardwareIsrCounter = 0;
@@ -68,33 +67,15 @@ uint32_t lastPrintTime = 0;
 
 Ball ball(motion, light, sound);
 HorizontalSplit horizontalSplit({255, 0, 0, 0}, {});
-SingleLED singleLED(LED_POSITIONS, LED_POSITION_COUNT, {255, 0, 0, 0});
-bool showUpperHalf = true;
-uint32_t lastEffectTime = 0;
 
 void applyLightSettings() {
   light.setEnabled(lightSettings.enabled);
   light.setLevel(lightSettings.intensity);
   const Color color{lightSettings.red, lightSettings.green, lightSettings.blue, 0};
   horizontalSplit.setTopColor(color);
-  singleLED.setColor(color);
 }
 
-void updateLightDemo(uint32_t now) {
-  if (static_cast<uint32_t>(now - lastEffectTime) < EFFECT_INTERVAL_MS) return;
-  lastEffectTime = now;
-  showUpperHalf = !showUpperHalf;
-  if (showUpperHalf) {
-    light.setEffect(horizontalSplit);
-    Serial.println("Light effect: HorizontalSplit.");
-  } else {
-    light.setEffect(singleLED);
-    Serial.println("Light effect: SingleLED.");
-  }
-}
-
-bool updateBall(uint32_t now) {
-  updateLightDemo(now);
+bool updateBall() {
   if (ball.update()) return true;
   Serial.println("Ball update failed; clearing LEDs.");
   strip.clear();
@@ -105,15 +86,6 @@ bool updateBall(uint32_t now) {
 #ifdef VISIOBALL_BMI270
 void updateAudioMotion(const Bmi270AudioSample& sample, uint32_t now) {
   sound.updateMotion(sample.angularSpeed, sample.roll, sample.pitch);
-  const TapGesture gesture = tapDetector.update(sample.accelX, sample.accelY, sample.accelZ, now);
-  if (!bleClientConnected()) {
-    switch (gesture) {
-    case TapGesture::Z: sound.onTapZ(); break;
-    case TapGesture::XPositive: sound.onTapX(1); break;
-    case TapGesture::XNegative: sound.onTapX(-1); break;
-    case TapGesture::None: break;
-    }
-  }
   if (sample.angularSpeed > Config::Motion::STATIONARY_THRESHOLD) {
     lastMotionTime = now;
   } else if (now - lastMotionTime >= 300 && now - lastHeartbeatCycleTime >= 1000) {
@@ -178,7 +150,7 @@ void runSystemTask(void*) {
   while (true) {
     applyReceivedConfiguration();
     const uint32_t now = millis();
-    if (updateBall(now)) {
+    if (updateBall()) {
       updateAudioMotion(sensor.audioSample(), now);
     }
     debug.update();
@@ -202,8 +174,8 @@ void setup() {
     Serial.println("Motion sensor initialization failed.");
     while (true) delay(1000);
   }
-  for (size_t i = 0; i < LED_POSITION_COUNT; ++i) {
-    if (!light.setPosition(i, LED_POSITIONS[i])) {
+  for (size_t i = 0; i < ACTIVE_LED_COUNT; ++i) {
+    if (!light.setPosition(i, ACTIVE_LED_POSITIONS[i])) {
       Serial.println("LED position configuration failed.");
       while (true) delay(1000);
     }
@@ -211,7 +183,6 @@ void setup() {
   light.setEffect(horizontalSplit);
   applyLightSettings();
   Serial.println("Light effect: HorizontalSplit.");
-  lastEffectTime = millis();
 
 #ifdef VISIOBALL_BMI270
   if (!initializeAudio()) {
@@ -246,7 +217,7 @@ void loop() {
     return;
   }
   lastSampleTime = now;
-  if (!updateBall(now)) {
+  if (!updateBall()) {
     delay(PRINT_INTERVAL_MS);
     return;
   }

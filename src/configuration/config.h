@@ -31,7 +31,7 @@ namespace Config {
     // Audio Engine & DSP Configuration
     namespace Sound {
         constexpr float MIN_VOLUME      = 1.0f;     // 1% minimum volume
-        constexpr float DEFAULT_VOLUME  = 5.0f;     // 5% safe low volume
+        constexpr float DEFAULT_VOLUME  = 1.0f;     // 1% startup volume
         constexpr float MAX_VOLUME      = 100.0f;
         constexpr int   DEFAULT_BLOCK_SIZE = 128;   // 128 or 256 samples
         constexpr int   SAMPLE_RATE     = 44100;

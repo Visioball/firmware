@@ -12,6 +12,7 @@
 #include "actuators/light/effects/SingleLED.h"
 #include "actuators/light/effects/Solid.h"
 #include "interfaces/IActuator.h"
+#include "interfaces/IMotionSensor.h"
 
 class FakeLightOutput : public ILightOutput {
 public:
@@ -318,6 +319,32 @@ int main() {
   for (size_t i = 0; i < LED_POSITION_COUNT; ++i) {
     assert(mappedOutput.pixels[i].red == (i == 9 ? 255 : 0));
   }
+
+  HorizontalSplit fadingSplit({255, 0, 64, 200}, {0, 200, 64, 0});
+  LED fadingLed;
+  fadingLed.hasPosition = true;
+  const float fadeHeights[] = {-1.0f, 0.0f, 0.0375f, 0.075f,
+                               0.1125f, 0.15f, 1.0f};
+  const uint8_t expectedRed[] = {0, 0, 40, 128, 215, 255, 255};
+  const uint8_t expectedGreen[] = {200, 200, 169, 100, 31, 0, 0};
+  const uint8_t expectedWhite[] = {0, 0, 31, 100, 169, 200, 200};
+  for (size_t i = 0; i < 7; ++i) {
+    fadingLed.position.z = fadeHeights[i];
+    assert(fadingSplit.update(fadingLed, mappedSpatial));
+    assert(fadingLed.color.red == expectedRed[i]);
+    assert(fadingLed.color.green == expectedGreen[i]);
+    assert(fadingLed.color.blue == 64);
+    assert(fadingLed.color.white == expectedWhite[i]);
+  }
+  const float lowerHeights[] = {-1.0f, -0.15f, -0.019f, -0.001f, 0.0f};
+  for (float height : lowerHeights) {
+    fadingLed.position.z = height;
+    assert(mappedSplit.update(fadingLed, mappedSpatial));
+    assert(fadingLed.color.red == 0 && fadingLed.color.green == 0);
+    assert(fadingLed.color.blue == 0 && fadingLed.color.white == 0);
+  }
+  fadingLed.hasPosition = false;
+  assert(!fadingSplit.update(fadingLed, mappedSpatial));
 
   mappedSensor.nextSample.acceleration.z = 2.0f;
   mappedSensor.nextSample.gyroscope.x = 80.0f;

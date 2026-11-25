@@ -47,19 +47,16 @@ bool Sound::selectSoundFontIndex(int index) {
     xSemaphoreTake(effectMutex, portMAX_DELAY);
     const bool selected = soundFont.select(index);
     xSemaphoreGive(effectMutex);
-    if (selected) tapCycleIndex = index;
     return selected;
 }
 
 bool Sound::selectEffectIndex(int index) {
     const int count = getSoundFontCount();
     if (index < 0 || index >= count + 2) return false;
-    tapTransitionPending = false;
     if (index < count) {
         if (!selectSoundFontIndex(index)) return false;
         setEffectType(SoundEffectType::SoundFont);
     } else {
-        tapCycleIndex = index;
         setEffectType(index == count ? SoundEffectType::WavDSP : SoundEffectType::Synth);
     }
     return true;
@@ -97,35 +94,7 @@ void Sound::triggerHeartbeat(float intensity) {
     xSemaphoreGive(effectMutex);
 }
 
-void Sound::onTapZ() {
-    tapCycleIndex = (tapCycleIndex + 1) % (getSoundFontCount() + 2);
-    pendingTapCycleIndex = tapCycleIndex;
-    tapTransitionPending = true;
-    tapTransitionStartedAt = millis();
-    setEffectType(SoundEffectType::Silent);
-}
-
-void Sound::onTapX(int direction) {
-    setMasterVolume(constrain(getMasterVolume() + (direction > 0 ? 10.0f : -10.0f),
-                              Config::Sound::MIN_VOLUME, Config::Sound::MAX_VOLUME));
-}
-
 bool Sound::update() {
-    if (!tapTransitionPending || millis() - tapTransitionStartedAt < 100) return true;
-    tapTransitionPending = false;
-    const int count = getSoundFontCount();
-    if (pendingTapCycleIndex < count) {
-        if (selectSoundFontIndex(pendingTapCycleIndex)) {
-            Serial.printf("[SOUND] Tap selected SoundFont: %s\n", getSoundFontName(pendingTapCycleIndex));
-            setEffectType(SoundEffectType::SoundFont);
-        } else {
-            Serial.printf("[SOUND] Failed to load SoundFont: %s\n", getSoundFontName(pendingTapCycleIndex));
-            tapCycleIndex = count + 1;
-            setEffectType(SoundEffectType::Synth);
-        }
-    } else {
-        setEffectType(pendingTapCycleIndex == count ? SoundEffectType::WavDSP : SoundEffectType::Synth);
-    }
     return true;
 }
 
