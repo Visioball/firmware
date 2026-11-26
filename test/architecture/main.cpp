@@ -12,6 +12,7 @@
 #include "actuators/light/effects/SingleLED.h"
 #include "actuators/light/effects/Solid.h"
 #include "energy/Energy.h"
+#include "connections/CommunicationProtocol.h"
 #include "interfaces/IActuator.h"
 #include "interfaces/IMotionSensor.h"
 
@@ -81,6 +82,20 @@ public:
 };
 
 int main() {
+  CommunicationProtocol::DeviceStatus status;
+  status.lightEnabled = true;
+  status.lightIntensity = 128;
+  status.audioPlaying = true;
+  status.audioVolume = 42;
+  status.charging = true;
+  auto packet = CommunicationProtocol::encode(status);
+  assert((packet == std::array<uint8_t, 5>{1, 3, 128, 42, 0}));
+  status.batteryAvailable = true;
+  status.batteryLevel = 75;
+  status.chargingAvailable = true;
+  packet = CommunicationProtocol::encode(status);
+  assert((packet == std::array<uint8_t, 5>{1, 31, 128, 42, 75}));
+
   Energy withoutBatteryMeter;
   uint8_t unavailableLevel = 42;
   assert(!withoutBatteryMeter.getBatteryLevel(unavailableLevel) && unavailableLevel == 42);

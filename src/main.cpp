@@ -120,6 +120,27 @@ void applyReceivedConfiguration() {
   }
 }
 
+CommunicationProtocol::DeviceStatus deviceStatus() {
+  static uint32_t lastBatteryRead = 0;
+  static bool batteryRead = false;
+  static bool batteryAvailable = false;
+  static uint8_t batteryLevel = 0;
+  const uint32_t now = millis();
+  if (!batteryRead || static_cast<uint32_t>(now - lastBatteryRead) >= 10000) {
+    batteryAvailable = energy.getBatteryLevel(batteryLevel);
+    lastBatteryRead = now;
+    batteryRead = true;
+  }
+  CommunicationProtocol::DeviceStatus status;
+  status.lightEnabled = lightSettings.enabled;
+  status.lightIntensity = lightSettings.intensity;
+  status.audioPlaying = IsPlayingBLE();
+  status.audioVolume = static_cast<uint8_t>(roundf(sound.getMasterVolume()));
+  status.batteryAvailable = batteryAvailable;
+  status.batteryLevel = batteryLevel;
+  return status;
+}
+
 bool initializeAudio() {
   if (!LittleFS.begin(false)) {
     debug.printFileSystemMountFailed();
@@ -159,6 +180,7 @@ void runSystemTask(void*) {
     if (energy.updateBleConnection(bleClientConnected())) {
       applyLightSettings();
     }
+    publishDeviceStatus(deviceStatus());
     const uint32_t now = millis();
     if (updateBall()) {
       updateAudioMotion(sensor.audioSample(), now);
@@ -200,7 +222,7 @@ void setup() {
     Serial.println("[SYSTEM] Fatal startup error; tasks were not started");
     while (true) delay(1000);
   }
-  bleInit("Visioball");
+  bleInit("Visioball", deviceStatus());
   const BaseType_t soundStarted = xTaskCreatePinnedToCore(
       runSoundTask, "SoundDspTask", 16384, nullptr, configMAX_PRIORITIES - 1, nullptr, 1);
   const BaseType_t systemStarted = xTaskCreatePinnedToCore(

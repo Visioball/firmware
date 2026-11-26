@@ -10,13 +10,11 @@
 #include <cmath>
 #include <cstdlib>
 
-#define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
-#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
-#define BAT_UUID            "a1b2c3d4-1111-2222-3333-abcdefabcdef"
-
 static BLEServer* bleServer = nullptr;
 static BLECharacteristic* mainChar = nullptr;
 static BLECharacteristic* batChar = nullptr;
+static BLECharacteristic* statusChar = nullptr;
+static std::array<uint8_t, 5> lastStatus{};
 static float receivedVolume = 5.0f;
 
 namespace {
@@ -207,7 +205,16 @@ class CharCallbacks : public BLECharacteristicCallbacks {
     }
 };
 
-void bleInit(const char* name) {
+void publishDeviceStatus(const CommunicationProtocol::DeviceStatus& status) {
+    if (!statusChar) return;
+    const auto encoded = CommunicationProtocol::encode(status);
+    if (encoded == lastStatus) return;
+    lastStatus = encoded;
+    statusChar->setValue(lastStatus.data(), lastStatus.size());
+    if (bleClientConnected()) statusChar->notify();
+}
+
+void bleInit(const char* name, const CommunicationProtocol::DeviceStatus& initialStatus) {
     configurationQueue = xQueueCreate(8, sizeof(ConfigurationUpdate));
     if (!configurationQueue) {
         Serial.println("[BLE] Cannot allocate configuration queue");
@@ -221,15 +228,20 @@ void bleInit(const char* name) {
     bleServer = BLEDevice::createServer();
     bleServer->setCallbacks(new ServerCallbacks());
 
-    BLEService* service = bleServer->createService(SERVICE_UUID);
+    BLEService* service = bleServer->createService(CommunicationProtocol::SERVICE_UUID);
     mainChar = service->createCharacteristic(
-        CHARACTERISTIC_UUID,
+        CommunicationProtocol::COMMAND_UUID,
         BLECharacteristic::PROPERTY_WRITE
     );
     batChar = service->createCharacteristic(
-        BAT_UUID,
+        CommunicationProtocol::BATTERY_UUID,
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
     );
+    statusChar = service->createCharacteristic(
+        CommunicationProtocol::STATUS_UUID,
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
+    );
+    publishDeviceStatus(initialStatus);
 
     mainChar->setCallbacks(new CharCallbacks());
     mainChar->setValue("ACTIVE");
@@ -238,7 +250,7 @@ void bleInit(const char* name) {
     BLEAdvertising* advertising = bleServer->getAdvertising();
     BLEAdvertisementData advertisementData;
     advertisementData.setFlags(0x06);
-    advertisementData.setCompleteServices(BLEUUID(SERVICE_UUID));
+    advertisementData.setCompleteServices(BLEUUID(CommunicationProtocol::SERVICE_UUID));
     advertising->setAdvertisementData(advertisementData);
 
     BLEAdvertisementData scanResponseData;
@@ -249,7 +261,7 @@ void bleInit(const char* name) {
     advertising->setMinPreferred(0x12);
     advertising->start();
 
-    Serial.printf("[BLE] Advertising as '%s' with service %s\n", name, SERVICE_UUID);
+    Serial.printf("[BLE] Advertising as '%s' with service %s\n", name, CommunicationProtocol::SERVICE_UUID);
 }
 
 void bleManagerInit(const char* deviceName) {

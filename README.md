@@ -56,6 +56,28 @@ definitions; the BLE JSON protocol is implemented in
 The audio output duplicates mono over I2S stereo; it is not a
 six-channel driver.
 
+### BLE status protocol
+
+The common UUIDs and status encoding are defined in
+`src/connections/CommunicationProtocol.h`. The status characteristic
+`a1b2c3d4-1111-2222-3333-abcdefabcdf0` is readable and notifies when its
+value changes. It contains five bytes, so it fits the minimum BLE MTU:
+
+| Byte | Meaning |
+|---|---|
+| 0 | Protocol version: `1` |
+| 1 | Flags: bit 0 configured light enabled, bit 1 audio playing, bit 2 battery level available, bit 3 charging state available, bit 4 charging |
+| 2 | Configured light intensity, 0–255 |
+| 3 | Audio master volume, 0–100 |
+| 4 | Battery percentage, 0–100, valid only if bit 2 is set |
+
+Light enabled is the configured setting; the BLE-disconnect policy can
+temporarily turn the LEDs off. Audio playing is independent of volume, so
+zero volume mutes without pausing playback. Charging is unknown unless bit 3
+is set. The current XIAO hardware has no battery meter or charging sensor
+connected: both availability bits remain clear. Existing JSON configuration
+and legacy battery commands remain unchanged.
+
 The XIAO build addresses 72 LEDs as one string. Its position array contains
 Fusion LED lens centers projected onto a unit sphere, in BMI270 sensor axes:
 +X points toward the ESP and +Z toward top PCB 4. Indices 0-35 correspond to

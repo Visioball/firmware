@@ -1,11 +1,13 @@
 #pragma once
 #include <Arduino.h>
 #include "../configuration/RuntimeConfiguration.h"
+#include "CommunicationProtocol.h"
 
-void bleInit(const char* deviceName);
+void bleInit(const char* deviceName, const CommunicationProtocol::DeviceStatus& initialStatus = {});
 void bleManagerInit(const char* deviceName);
 bool bleClientConnected();
 bool receiveConfiguration(ConfigurationUpdate& update);
+void publishDeviceStatus(const CommunicationProtocol::DeviceStatus& status);
 
 void sendBattery(uint8_t percent);
 void SendCharging(bool charging);
