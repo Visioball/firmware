@@ -145,6 +145,18 @@ int main() {
   red.white = 42;
   Solid solid(red);
 
+  FakeLightOutput limitedOutput;
+  Light limitedLight(limitedOutput, spatial, 1);
+  limitedLight.setEffect(solid);
+  limitedLight.setEnabled(true);
+  for (const auto &sample : std::array<std::array<uint8_t, 2>, 5>{{
+           {{0, 0}}, {{199, 199}}, {{200, 200}}, {{201, 200}}, {{255, 200}}
+       }}) {
+    limitedLight.setLevel(sample[0]);
+    assert(limitedLight.update());
+    assert(limitedOutput.brightness == sample[1]);
+  }
+
   Quaternion orientation;
   Vector3 position;
   Vector3 world;

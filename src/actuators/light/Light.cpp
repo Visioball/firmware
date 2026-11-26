@@ -35,7 +35,7 @@ bool Light::update() {
       return false;
     }
   }
-  output_.setBrightness(level_);
+  output_.setBrightness(level_ > MAX_BRIGHTNESS ? MAX_BRIGHTNESS : level_);
   output_.clear();
   for (size_t i = 0; i < activeLedCount_; ++i) {
     output_.setPixel(i, leds_[i].color);

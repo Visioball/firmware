@@ -13,6 +13,7 @@ class Light : public IActuator {
 
   public:
   static constexpr size_t MAX_LEDS = 72;
+  static constexpr uint8_t MAX_BRIGHTNESS = 100;
 
   private:
   ILightOutput &output_;

@@ -34,6 +34,10 @@ smoothstep fade only just above the horizontal boundary (world heights 0 to
 +0.15 on the unit sphere). The lower half stays completely off. The number
 of LEDs in this narrow transition depends on their positions and orientation.
 BLE can change the XIAO demo's color, brightness and enabled state.
+The light output caps brightness at 200/255 on both boards, regardless of
+the requested setting or its source. Values below the cap are unchanged.
+BLE status reports the requested intensity (0-255), so settings above 200
+all produce the same maximum output brightness.
 The XIAO switches the light off when no BLE client is connected and restores
 the configured light status on connection. This does not yet put the device
 to sleep or stop the audio.
