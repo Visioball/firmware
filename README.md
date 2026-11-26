@@ -34,9 +34,20 @@ smoothstep fade only just above the horizontal boundary (world heights 0 to
 +0.15 on the unit sphere). The lower half stays completely off. The number
 of LEDs in this narrow transition depends on their positions and orientation.
 BLE can change the XIAO demo's color, brightness and enabled state.
+The XIAO switches the light off when no BLE client is connected and restores
+the configured light status on connection. This does not yet put the device
+to sleep or stop the audio.
 
-Audio starts at 1% volume on every boot. Change volume and audio modes via
-BLE or serial commands; tap gesture controls are not used.
+The XIAO starts with audio muted and BLE available. Write the text `PLAY` to
+the BLE command characteristic to enable audio, or `PAUSE` to mute it again.
+The initial volume is 1%; volume and audio mode changes via BLE or serial do
+not unmute it. Audio remains enabled after a BLE disconnect until `PAUSE` or a
+restart. This quiet mode still runs the audio and I2S tasks; it is not a
+power-saving sleep mode. Tap gesture controls are not used.
+
+For example, in nRF Connect connect to `Visioball`, find service
+`4fafc201-1fb5-459e-8fcc-c5c9c331914b`, and write `PLAY` or `PAUSE` as text
+to characteristic `beb5483e-36e1-4688-b7f5-ea07361b26a8`.
 
 The XIAO LED data pin is D5, the BMI270 uses SPI and INT1, and I2S uses
 BCK D1, WS D0 and DATA D2. See `src/configuration/config.h` for pin
@@ -81,6 +92,14 @@ The layout follows the class diagram in `docs/Klassendiagram v3.png`; the
 - `src/motion/`: `Motion` and `Orientation`, using the `IMotionSensor`
   interface and `MotionSample`.
 - `src/motion/spatial/`: `Vector3`, `Quaternion` and `Spatial`.
+- `src/energy/`: `Energy` tracks BLE availability for the XIAO light and
+  can obtain a battery percentage from a `BatteryLevelMeter` implementation.
+  A meter, if provided, must outlive the `Energy`
+  instance; `getBatteryLevel` returns false without changing its output when
+  a reading fails or is outside 0-100%.
+  Its inactivity policy is currently not connected to the firmware loop:
+  enabling it and recording activity only determine eligibility for sleep;
+  they do not stop the hardware or change power consumption.
 - `src/sensors/`: the `IMotionSensor` adapters `MPU9250Sensor` (DevKit)
   and `Bmi270Sensor` (XIAO).
 - `src/configuration/`, `src/connections/`, `src/debug/`: BLE JSON
@@ -148,6 +167,11 @@ sensor adapter does not yet detect failed reads.
   six discrete speaker channels still need a PCM1681-style driver.
 - `LightEffectType` is vocabulary for future selection; it does not yet
   create effects or extend the JSON protocol.
+- Battery measurement is not yet available: the XIAO ESP32-S3 battery pads
+  are not connected to an ADC, and the current 1S LiPo has no external
+  measurement circuit. A suitable circuit and meter implementation are
+  needed before enabling measurements or calling BLE `sendBattery`.
+  See [Seeed's battery usage documentation](https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/#battery-usage).
 
 The motion, light, and sound services must outlive the `Ball` that references
 them. The shared `Orientation` must outlive both `Motion` and `Spatial`.
@@ -169,7 +193,7 @@ hardware geometry and ownership before implementing spatial effects.
 With a native C++ compiler, the model checks can be run without an ESP32:
 
 ```powershell
-g++ -std=c++17 -Isrc test\architecture\main.cpp src\Ball.cpp src\actuators\light\Light.cpp (Get-ChildItem src\actuators\light\effects -Filter *.cpp | ForEach-Object { $_.FullName }) src\motion\Motion.cpp src\motion\Orientation.cpp src\motion\spatial\Spatial.cpp -o architecture-tests.exe
+g++ -std=c++17 -Isrc test\architecture\main.cpp src\Ball.cpp src\energy\Energy.cpp src\actuators\light\Light.cpp (Get-ChildItem src\actuators\light\effects -Filter *.cpp | ForEach-Object { $_.FullName }) src\motion\Motion.cpp src\motion\Orientation.cpp src\motion\spatial\Spatial.cpp -o architecture-tests.exe
 .\architecture-tests.exe
 ```
 

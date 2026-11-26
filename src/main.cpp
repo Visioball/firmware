@@ -16,6 +16,7 @@
 #include "configuration/config.h"
 #include "connections/ble.h"
 #include "debug/DebugLogger.h"
+#include "energy/Energy.h"
 #include "sensors/Bmi270Sensor.h"
 #else
 #include <Wire.h>
@@ -55,6 +56,7 @@ uint32_t lastMotionTime = 0;
 uint32_t lastHeartbeatCycleTime = 0;
 volatile uint32_t hardwareIsrCounter = 0;
 DebugLogger debug(sound, sensor, hardwareIsrCounter);
+Energy energy;
 #else
 class DisabledAudio final : public IActuator {
 public:
@@ -69,7 +71,11 @@ Ball ball(motion, light, sound);
 HorizontalSplit horizontalSplit({255, 0, 0, 0}, {});
 
 void applyLightSettings() {
+#ifdef VISIOBALL_BMI270
+  light.setEnabled(lightSettings.enabled && energy.lightAllowed());
+#else
   light.setEnabled(lightSettings.enabled);
+#endif
   light.setLevel(lightSettings.intensity);
   const Color color{lightSettings.red, lightSettings.green, lightSettings.blue, 0};
   horizontalSplit.setTopColor(color);
@@ -149,6 +155,10 @@ void runSystemTask(void*) {
   debug.printTaskStarted("System", xPortGetCoreID(), uxTaskPriorityGet(nullptr));
   while (true) {
     applyReceivedConfiguration();
+    sound.setEnabled(IsPlayingBLE());
+    if (energy.updateBleConnection(bleClientConnected())) {
+      applyLightSettings();
+    }
     const uint32_t now = millis();
     if (updateBall()) {
       updateAudioMotion(sensor.audioSample(), now);
@@ -185,6 +195,7 @@ void setup() {
   Serial.println("Light effect: HorizontalSplit.");
 
 #ifdef VISIOBALL_BMI270
+  sound.setEnabled(false);
   if (!initializeAudio()) {
     Serial.println("[SYSTEM] Fatal startup error; tasks were not started");
     while (true) delay(1000);

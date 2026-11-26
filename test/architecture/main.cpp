@@ -11,6 +11,7 @@
 #include "actuators/light/effects/HorizontalSplit.h"
 #include "actuators/light/effects/SingleLED.h"
 #include "actuators/light/effects/Solid.h"
+#include "energy/Energy.h"
 #include "interfaces/IActuator.h"
 #include "interfaces/IMotionSensor.h"
 
@@ -69,7 +70,53 @@ public:
   MotionSample nextSample;
 };
 
+class FakeBatteryLevelMeter : public BatteryLevelMeter {
+public:
+  bool readLevel(uint8_t &percent) override {
+    percent = level;
+    return succeeds;
+  }
+  uint8_t level = 0;
+  bool succeeds = true;
+};
+
 int main() {
+  Energy withoutBatteryMeter;
+  uint8_t unavailableLevel = 42;
+  assert(!withoutBatteryMeter.getBatteryLevel(unavailableLevel) && unavailableLevel == 42);
+  assert(!withoutBatteryMeter.lightAllowed());
+  assert(withoutBatteryMeter.updateBleConnection(true));
+  assert(withoutBatteryMeter.lightAllowed());
+  assert(!withoutBatteryMeter.updateBleConnection(true));
+  assert(withoutBatteryMeter.updateBleConnection(false));
+  assert(!withoutBatteryMeter.lightAllowed());
+  assert(!withoutBatteryMeter.shouldSleep(Energy::INACTIVITY_MS));
+  withoutBatteryMeter.setPowerSavingEnabled(true, 100);
+  assert(!withoutBatteryMeter.shouldSleep(100 + Energy::INACTIVITY_MS - 1));
+  assert(withoutBatteryMeter.shouldSleep(100 + Energy::INACTIVITY_MS));
+  withoutBatteryMeter.recordActivity(100 + Energy::INACTIVITY_MS);
+  assert(!withoutBatteryMeter.shouldSleep(100 + Energy::INACTIVITY_MS));
+  withoutBatteryMeter.updateBleConnection(true);
+  assert(!withoutBatteryMeter.shouldSleep(100 + 2 * Energy::INACTIVITY_MS));
+  withoutBatteryMeter.updateBleConnection(false);
+  withoutBatteryMeter.setPowerSavingEnabled(false, 200);
+  assert(!withoutBatteryMeter.shouldSleep(200 + Energy::INACTIVITY_MS));
+  withoutBatteryMeter.setPowerSavingEnabled(true, UINT32_MAX - 100);
+  assert(!withoutBatteryMeter.shouldSleep(Energy::INACTIVITY_MS - 102));
+  assert(withoutBatteryMeter.shouldSleep(Energy::INACTIVITY_MS - 101));
+
+  FakeBatteryLevelMeter batteryMeter;
+  Energy energy(batteryMeter);
+  uint8_t batteryLevel = 42;
+  assert(energy.getBatteryLevel(batteryLevel) && batteryLevel == 0);
+  batteryMeter.level = 100;
+  assert(energy.getBatteryLevel(batteryLevel) && batteryLevel == 100);
+  batteryMeter.level = 101;
+  assert(!energy.getBatteryLevel(batteryLevel) && batteryLevel == 100);
+  batteryMeter.succeeds = false;
+  batteryMeter.level = 25;
+  assert(!energy.getBatteryLevel(batteryLevel) && batteryLevel == 100);
+
   FakeMotionSensor sensor;
   Orientation orientationEstimate;
   Motion motion(sensor, orientationEstimate);

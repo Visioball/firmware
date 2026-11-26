@@ -5,6 +5,7 @@
 #include <BLE2902.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
+#include <atomic>
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
@@ -62,7 +63,7 @@ void receiveConfigurationChunk(const String& chunk) {
 static int song = 0;
 static const int songAmount = 5;
 
-bool isPlayingBLE = true;
+std::atomic<bool> isPlayingBLE{false};
 bool isSleepingBLE = false;
 
 int GetCurrentSong() {
@@ -70,7 +71,7 @@ int GetCurrentSong() {
 }
 
 bool IsPlayingBLE() {
-    return isPlayingBLE;
+    return isPlayingBLE.load();
 }
 
 float GetReceivedVolume() {
@@ -174,12 +175,10 @@ class CharCallbacks : public BLECharacteristicCallbacks {
             isSleepingBLE = false;
             Serial.println("[CMD] WAKE -> waking up");
         } else if (value == "PAUSE") {
-            if (!isPlayingBLE) return;
-            isPlayingBLE = false;
+            if (!isPlayingBLE.exchange(false)) return;
             Serial.println("[CMD] PAUSE -> paused");
         } else if (value == "PLAY") {
-            if (isPlayingBLE) return;
-            isPlayingBLE = true;
+            if (isPlayingBLE.exchange(true)) return;
             Serial.println("[CMD] PLAY -> playing");
         } else if (value == "NEXT") {
             song = (song + 1) % songAmount;
