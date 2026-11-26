@@ -35,7 +35,9 @@ bool Light::update() {
       return false;
     }
   }
-  output_.setBrightness(level_ > MAX_BRIGHTNESS ? MAX_BRIGHTNESS : level_);
+  const uint8_t brightness = static_cast<uint8_t>(
+      (static_cast<uint16_t>(level_) * MAX_BRIGHTNESS + 127) / 255);
+  output_.setBrightness(brightness);
   output_.clear();
   for (size_t i = 0; i < activeLedCount_; ++i) {
     output_.setPixel(i, leds_[i].color);

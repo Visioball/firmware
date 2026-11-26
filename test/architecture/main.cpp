@@ -149,8 +149,8 @@ int main() {
   Light limitedLight(limitedOutput, spatial, 1);
   limitedLight.setEffect(solid);
   limitedLight.setEnabled(true);
-  for (const auto &sample : std::array<std::array<uint8_t, 2>, 5>{{
-           {{0, 0}}, {{199, 199}}, {{200, 200}}, {{201, 200}}, {{255, 200}}
+  for (const auto &sample : std::array<std::array<uint8_t, 2>, 6>{{
+           {{0, 0}}, {{1, 0}}, {{40, 16}}, {{128, 50}}, {{254, 100}}, {{255, 100}}
        }}) {
     limitedLight.setLevel(sample[0]);
     assert(limitedLight.update());
@@ -223,7 +223,7 @@ int main() {
   light.setLevel(15);
   assert(light.update());
   assert(output.showCount == 2);
-  assert(output.brightness == 15);
+  assert(output.brightness == 6);
   for (size_t i = 0; i < output.pixels.size(); ++i) {
     assert(output.pixels[i].red == (i < 45 ? 255 : 0));
     assert(output.pixels[i].white == (i < 45 ? 42 : 0));
