@@ -159,6 +159,13 @@ void DebugLogger::update() {
                       stats.blockSize, stats.idealBlockTimeUs, sound.getMasterVolume());
         Serial.printf(" Sample Rate: %.0f Hz | Peak PCM: %d | Avg PCM: %.1f | Stream: %u KB\n",
                       stats.sampleRate, stats.peakPcm, stats.avgPcm, (unsigned)(stats.totalBytesWritten / 1024));
+        if (stats.streamElapsedUs > 0) {
+            const float framesPerSecond =
+                (static_cast<float>(stats.totalBytesWritten) / 4.0f) *
+                1000000.0f / static_cast<float>(stats.streamElapsedUs);
+            Serial.printf(" I2S write rate: %.0f frames/s over %.2f s (approximate)\n",
+                          framesPerSecond, static_cast<double>(stats.streamElapsedUs) / 1000000.0);
+        }
         Serial.printf(" Gyro: %.2f rad/s | Synth tone: %.0f Hz | BMI270: %s\n",
                   sensor.audioSample().angularSpeed, sound.getSynthFrequency(),
                   sensor.connected() ? "connected" : "disconnected");

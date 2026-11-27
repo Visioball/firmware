@@ -29,6 +29,7 @@ struct BenchmarkStats {
     int16_t peakPcm;
     float avgPcm;
     size_t totalBytesWritten;
+    int64_t streamElapsedUs;
     int blockSize;
     float sampleRate;
     int64_t idealBlockTimeUs;
@@ -92,6 +93,7 @@ private:
     volatile int64_t currentInterruptTimestamp;
     volatile int64_t currentAudioStartTimestamp;
     BenchmarkStats stats;
+    int64_t streamStartUs = 0;
     portMUX_TYPE statsMux;
     TaskHandle_t audioTaskHandle;
     std::atomic<bool> running;

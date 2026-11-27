@@ -30,15 +30,15 @@ const Vector3 LED_POSITIONS[LED_POSITION_COUNT] = {
 };
 
 #ifdef VISIOBALL_BMI270
-constexpr size_t XIAO_LED_STRING_COUNT = 2;
-constexpr size_t XIAO_LEDS_PER_STRING = 36;
-constexpr size_t XIAO_LED_POSITION_COUNT =
-    XIAO_LED_STRING_COUNT * XIAO_LEDS_PER_STRING;
+constexpr size_t FUSION_LED_STRING_COUNT = 2;
+constexpr size_t FUSION_LEDS_PER_STRING = 36;
+constexpr size_t FUSION_LED_POSITION_COUNT =
+    FUSION_LED_STRING_COUNT * FUSION_LEDS_PER_STRING;
 
 // Fusion LED lens centers projected onto the unit sphere, in BMI270 axes:
 // +X toward the ESP, +Z toward top PCB 4, +Y completes a right-handed frame.
 // Indices 0-35 are B01-B36; indices 36-71 are T01-T36.
-const Vector3 LED_POSITIONS_XIAO[XIAO_LED_POSITION_COUNT] = {
+const Vector3 LED_POSITIONS_FUSION[FUSION_LED_POSITION_COUNT] = {
     {-0.30906744f, +0.22316083f, -0.92448719f}, // 01 B01
     {-0.17551969f, +0.30517948f, -0.93597987f}, // 02 B02
     {-0.03763763f, +0.37966198f, -0.92435934f}, // 03 B03

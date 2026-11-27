@@ -6,8 +6,25 @@
 // =============================================================================
 
 namespace Config {
-    // Pin Definitions (Seeed XIAO ESP32S3)
+    // Board-specific pin definitions
     namespace Pins {
+#if defined(VISIOBALL_ESP32_S3_DEVKITC1_V11)
+        constexpr uint8_t LED_DATA_1   = 40;
+        constexpr uint8_t LED_DATA_2   = 41;
+
+        // MAX98357A I2S amplifier
+        constexpr uint8_t MAX98357_SD  = 4;
+        constexpr uint8_t I2S_DATA     = 5;
+        constexpr uint8_t I2S_BCK      = 6;
+        constexpr uint8_t I2S_WS       = 7;
+
+        // BMI270 SPI
+        constexpr uint8_t BMI270_CS    = 10;
+        constexpr uint8_t SPI_MOSI     = 11;
+        constexpr uint8_t SPI_SCK      = 12;
+        constexpr uint8_t SPI_MISO     = 13;
+#else
+        // Seeed XIAO ESP32S3
         constexpr uint8_t LED_DATA      = D5;
 
         // I2S Audio
@@ -22,6 +39,7 @@ namespace Config {
         constexpr uint8_t SPI_MISO      = D10;  // GPIO 9/10
         constexpr uint8_t BMI270_INT1   = D6;   // GPIO 43
         constexpr uint8_t BMI270_INT2   = D7;   // GPIO 44
+#endif
 
         // MPU9250 I2C Motion Sensor
         constexpr uint8_t MPU9250_SDA   = 16;
@@ -60,5 +78,7 @@ namespace Config {
 #define PIN_SPI_SCK          Config::Pins::SPI_SCK
 #define PIN_SPI_MOSI         Config::Pins::SPI_MOSI
 #define PIN_SPI_MISO         Config::Pins::SPI_MISO
+#if !defined(VISIOBALL_ESP32_S3_DEVKITC1_V11)
 #define PIN_BMI270_INT1      Config::Pins::BMI270_INT1
 #define PIN_BMI270_INT2      Config::Pins::BMI270_INT2
+#endif

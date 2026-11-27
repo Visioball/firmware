@@ -35,6 +35,7 @@ bool Sound::init(const char* wavPath, int blockSize) {
     stats.blockSize = currentBlockSize;
     stats.idealBlockTimeUs = static_cast<int64_t>(currentBlockSize * 1000000.0f / stats.sampleRate);
     if (!output.begin(static_cast<uint32_t>(stats.sampleRate), currentBlockSize)) return false;
+    streamStartUs = esp_timer_get_time();
     running = true;
     return true;
 }
@@ -218,6 +219,7 @@ void Sound::renderTaskLoop() {
 BenchmarkStats Sound::getStats() {
     taskENTER_CRITICAL(&statsMux);
     BenchmarkStats result = stats;
+    result.streamElapsedUs = esp_timer_get_time() - streamStartUs;
     taskEXIT_CRITICAL(&statsMux);
     if (result.blockCount) {
         result.blockDurationAvgUs = result.blockDurationTotalUs / result.blockCount;
@@ -235,6 +237,7 @@ void Sound::resetPeriodicStats() {
     stats.peakPcm = 0;
     stats.avgPcm = 0.0f;
     stats.totalBytesWritten = 0;
+    streamStartUs = esp_timer_get_time();
     taskEXIT_CRITICAL(&statsMux);
 }
 

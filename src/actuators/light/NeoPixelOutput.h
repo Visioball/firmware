@@ -7,6 +7,8 @@
 class NeoPixelOutput : public ILightOutput {
 public:
   explicit NeoPixelOutput(Adafruit_NeoPixel &strip);
+  NeoPixelOutput(Adafruit_NeoPixel &firstStrip, Adafruit_NeoPixel &secondStrip,
+                 size_t firstStripLedCount);
   void clear() override;
   void setBrightness(uint8_t brightness) override;
   void setPixel(size_t index, const Color &color) override;
@@ -14,4 +16,6 @@ public:
 
 private:
   Adafruit_NeoPixel &strip_;
+  Adafruit_NeoPixel *secondStrip_ = nullptr;
+  size_t firstStripLedCount_ = 0;
 };

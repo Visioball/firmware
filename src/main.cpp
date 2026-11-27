@@ -25,9 +25,16 @@
 
 namespace {
 #ifdef VISIOBALL_BMI270
+#ifdef VISIOBALL_ESP32_S3_DEVKITC1_V11
+constexpr uint8_t LED_PIN_1 = Config::Pins::LED_DATA_1;
+constexpr uint8_t LED_PIN_2 = Config::Pins::LED_DATA_2;
+constexpr size_t ACTIVE_LED_COUNT = FUSION_LED_POSITION_COUNT;
+const Vector3 *const ACTIVE_LED_POSITIONS = LED_POSITIONS_FUSION;
+#else
 constexpr uint8_t LED_PIN = Config::Pins::LED_DATA;
-constexpr size_t ACTIVE_LED_COUNT = XIAO_LED_POSITION_COUNT;
-const Vector3 *const ACTIVE_LED_POSITIONS = LED_POSITIONS_XIAO;
+constexpr size_t ACTIVE_LED_COUNT = FUSION_LED_POSITION_COUNT;
+const Vector3 *const ACTIVE_LED_POSITIONS = LED_POSITIONS_FUSION;
+#endif
 Bmi270Sensor sensor;
 #else
 constexpr int SDA_PIN = 16;
@@ -41,8 +48,21 @@ const Vector3 *const ACTIVE_LED_POSITIONS = LED_POSITIONS;
 MPU9250Sensor sensor(Wire, IMU_ADDRESS);
 #endif
 
+#ifdef VISIOBALL_BMI270
+#ifdef VISIOBALL_ESP32_S3_DEVKITC1_V11
+Adafruit_NeoPixel strip1(FUSION_LEDS_PER_STRING, LED_PIN_1,
+                         NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip2(FUSION_LEDS_PER_STRING, LED_PIN_2,
+                         NEO_GRB + NEO_KHZ800);
+NeoPixelOutput lightOutput(strip1, strip2, FUSION_LEDS_PER_STRING);
+#else
 Adafruit_NeoPixel strip(ACTIVE_LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 NeoPixelOutput lightOutput(strip);
+#endif
+#else
+Adafruit_NeoPixel strip(ACTIVE_LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+NeoPixelOutput lightOutput(strip);
+#endif
 Orientation orientationEstimate;
 Spatial spatial(orientationEstimate);
 Motion motion(sensor, orientationEstimate);
@@ -84,8 +104,8 @@ void applyLightSettings() {
 bool updateBall() {
   if (ball.update()) return true;
   Serial.println("Ball update failed; clearing LEDs.");
-  strip.clear();
-  strip.show();
+  lightOutput.clear();
+  lightOutput.show();
   return false;
 }
 
@@ -161,10 +181,12 @@ bool initializeAudio() {
   return true;
 }
 
+#ifndef VISIOBALL_ESP32_S3_DEVKITC1_V11
 void IRAM_ATTR onMotionInterrupt() {
   hardwareIsrCounter = hardwareIsrCounter + 1;
   sound.triggerMotionInterrupt(esp_timer_get_time());
 }
+#endif
 
 void runSoundTask(void*) {
   debug.printTaskStarted("Sound DSP", xPortGetCoreID(), uxTaskPriorityGet(nullptr));
@@ -176,7 +198,11 @@ void runSystemTask(void*) {
   debug.printTaskStarted("System", xPortGetCoreID(), uxTaskPriorityGet(nullptr));
   while (true) {
     applyReceivedConfiguration();
-    sound.setEnabled(IsPlayingBLE());
+    const bool audioEnabled = IsPlayingBLE();
+    sound.setEnabled(audioEnabled);
+#ifdef VISIOBALL_ESP32_S3_DEVKITC1_V11
+    digitalWrite(Config::Pins::MAX98357_SD, audioEnabled ? HIGH : LOW);
+#endif
     if (energy.updateBleConnection(bleClientConnected())) {
       applyLightSettings();
     }
@@ -195,13 +221,32 @@ void runSystemTask(void*) {
 void setup() {
   Serial.begin(115200);
 #ifdef VISIOBALL_BMI270
+#ifdef VISIOBALL_ESP32_S3_DEVKITC1_V11
+  pinMode(Config::Pins::MAX98357_SD, OUTPUT);
+  digitalWrite(Config::Pins::MAX98357_SD, LOW);
+#endif
   debug.printStartupBanner(static_cast<int>(esp_reset_reason()));
 #else
   Wire.begin(SDA_PIN, SCL_PIN);
 #endif
+#ifdef VISIOBALL_BMI270
+#ifdef VISIOBALL_ESP32_S3_DEVKITC1_V11
+  strip1.begin();
+  strip2.begin();
+  strip1.clear();
+  strip2.clear();
+  strip1.show();
+  strip2.show();
+#else
   strip.begin();
   strip.clear();
   strip.show();
+#endif
+#else
+  strip.begin();
+  strip.clear();
+  strip.show();
+#endif
   if (!ball.begin()) {
     Serial.println("Motion sensor initialization failed.");
     while (true) delay(1000);
@@ -231,8 +276,10 @@ void setup() {
     Serial.println("[SYSTEM] Fatal: cannot create firmware tasks");
     esp_restart();
   }
+#ifndef VISIOBALL_ESP32_S3_DEVKITC1_V11
   pinMode(PIN_BMI270_INT1, INPUT_PULLDOWN);
   attachInterrupt(digitalPinToInterrupt(PIN_BMI270_INT1), onMotionInterrupt, RISING);
+#endif
 #else
   Serial.println("MPU9250 ready.");
   lastSampleTime = millis();
