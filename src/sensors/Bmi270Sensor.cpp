@@ -31,8 +31,20 @@ bool Bmi270Sensor::begin() {
         return false;
     }
 
+    bmi2_sens_config gyroConfig{};
+    gyroConfig.type = BMI2_GYRO;
+    status = bmi.getConfig(&gyroConfig);
+    if (status == BMI2_OK && gyroConfig.cfg.gyr.range != BMI2_GYR_RANGE_2000) {
+        gyroConfig.cfg.gyr.range = BMI2_GYR_RANGE_2000;
+        status = bmi.setConfig(gyroConfig);
+    }
+    if (status != BMI2_OK) {
+        Serial.printf("[BMI270 ERROR] Unable to configure gyroscope range (error code: %d)\n", status);
+        return false;
+    }
+
     sensorConnected = true;
-    Serial.println("[BMI270] Connected");
+    Serial.println("[BMI270] Connected; gyroscope range +/-2000 deg/s");
     calibrateGyro();
     captureReferenceOrientation();
     configureMotionInterrupt();

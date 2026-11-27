@@ -42,7 +42,8 @@ public:
         bitsPerSample        = *(const uint16_t*)(header + 34);
         uint32_t dataSize    = *(const uint32_t*)(header + 40);
 
-        if (audioFormat != 1 || bitsPerSample != 16) {
+        if (audioFormat != 1 || bitsPerSample != 16 ||
+            (channels != 1 && channels != 2) || sampleRate == 0) {
             snprintf(loadLog, sizeof(loadLog), "unsupported fmt=%u bits=%u", audioFormat, bitsPerSample);
             Serial.printf("[WAV] %s\n", loadLog);
             f.close();
@@ -53,24 +54,34 @@ public:
         freeBuffer();
         size_t totalSamples = dataSize / (sizeof(int16_t) * channels);
         size_t monoBytes = totalSamples * sizeof(int16_t);
+        if (monoBytes == 0) {
+            Serial.println("[WAV] Empty WAV source");
+            return false;
+        }
 
         // Size the buffer to the largest free PSRAM block (leave 256 KB margin)
         size_t bufferBytes = 0;
         if (preferPsram && psramFound()) {
             size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
             size_t usable = (largest > 256 * 1024) ? (largest - 256 * 1024) : 0;
-            bufferBytes = (monoBytes < usable) ? monoBytes : usable;
+            bufferBytes = monoBytes <= usable ? monoBytes : 0;
             bufferBytes &= ~1u;
             if (bufferBytes >= 2) {
                 ramSamples = (int16_t*)heap_caps_malloc(bufferBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-                if (ramSamples) inPsram = true;
+                if (ramSamples) {
+                    inPsram = true;
+                    ownsSamples = true;
+                }
             }
         }
         if (!ramSamples) {
-            bufferBytes = (monoBytes < 180 * 1024) ? monoBytes : 180 * 1024; // internal RAM cap
+            bufferBytes = monoBytes <= 180 * 1024 ? monoBytes : 0;
             bufferBytes &= ~1u;
-            ramSamples = (int16_t*)heap_caps_malloc(bufferBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+            if (bufferBytes) {
+                ramSamples = (int16_t*)heap_caps_malloc(bufferBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+            }
             inPsram = false;
+            ownsSamples = ramSamples != nullptr;
         }
         if (!ramSamples) {
             snprintf(loadLog, sizeof(loadLog), "malloc FAILED (%u KB)", (unsigned)(monoBytes / 1024));
@@ -119,6 +130,12 @@ public:
         }
         free(chunk);
         f.close();
+        if ((channels == 1 && bytesRead != bufferBytes) ||
+            (channels == 2 && sampleCount != totalSamples)) {
+            Serial.println("[WAV] Incomplete WAV read");
+            freeBuffer();
+            return false;
+        }
 
         snprintf(loadLog, sizeof(loadLog), "%s %uKB %uHz %.1fs [%d %d %d]",
                  inPsram ? "PSRAM" : "IntRAM", (unsigned)(bufferBytes / 1024), sampleRate,
@@ -206,6 +223,7 @@ public:
                 ramSamples = (int16_t*)heap_caps_malloc(bufferBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
                 if (ramSamples) {
                     inPsram = true;
+                    ownsSamples = true;
                     size_t loadedSamples = bufferBytes / sizeof(int16_t);
 
                     if (channels == 1) {
@@ -238,12 +256,13 @@ public:
     }
 
     void freeBuffer() {
-        if (ramSamples && inPsram) {
+        if (ramSamples && ownsSamples) {
             free(ramSamples);
         }
         ramSamples = nullptr;
         sampleCount = 0;
         inPsram = false;
+        ownsSamples = false;
     }
 
     inline int16_t getSample(size_t index) const {
@@ -256,7 +275,7 @@ public:
     inline uint32_t getSampleRate() const { return sampleRate; }
     inline uint16_t getChannels() const { return channels; }
     inline bool isLoadedInPsram() const { return inPsram; }
-    inline bool isFlashMapped() const { return ramSamples != nullptr && !inPsram; }
+    inline bool isFlashMapped() const { return ramSamples != nullptr && !ownsSamples; }
     inline const char* getLoadLog() const { return loadLog; }
 
 private:
@@ -266,5 +285,6 @@ private:
     uint16_t channels;
     uint16_t bitsPerSample;
     bool inPsram;
+    bool ownsSamples = false;
     char loadLog[96];
 };

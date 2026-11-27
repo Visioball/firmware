@@ -8,6 +8,7 @@ void bleManagerInit(const char* deviceName);
 bool bleClientConnected();
 bool receiveConfiguration(ConfigurationUpdate& update);
 void publishDeviceStatus(const CommunicationProtocol::DeviceStatus& status);
+bool publishAudioCatalog(const CommunicationProtocol::AudioMode* modes, size_t count);
 
 void sendBattery(uint8_t percent);
 void SendCharging(bool charging);

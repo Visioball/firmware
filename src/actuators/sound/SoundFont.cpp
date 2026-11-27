@@ -16,6 +16,7 @@ int SoundFont::scanFiles() {
         if (!file.isDirectory() && (name.endsWith(".sf2") || name.endsWith(".SF2"))) {
             String path = name.startsWith("/") ? name : "/" + name;
             String displayName = name.startsWith("/") ? name.substring(1) : name;
+            displayName.remove(displayName.length() - 4);
             strncpy(soundFontPaths[soundFontCount], path.c_str(), sizeof(soundFontPaths[0]) - 1);
             strncpy(soundFontNames[soundFontCount], displayName.c_str(), sizeof(soundFontNames[0]) - 1);
             soundFontCount++;

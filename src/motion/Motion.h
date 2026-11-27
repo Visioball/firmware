@@ -9,6 +9,8 @@ private:
   Vector3 gyroscope_;
   Vector3 acceleration_;
   Orientation &orientation_;
+  float rollingSpeed_ = 0.0f;
+  bool rollingSpeedValid_ = false;
 
 public:
   Motion(IMotionSensor &sensor, Orientation &orientation);
@@ -18,4 +20,5 @@ public:
 
   const Vector3 &getAccelerationValue() const;
   const Vector3 &getGyroscopeValue() const;
+  bool getRollingSpeed(float &radiansPerSecond) const;
 };

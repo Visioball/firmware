@@ -4,7 +4,7 @@
 #include "Ball.h"
 #include "actuators/light/LEDPositions.h"
 #include "actuators/light/LightSettings.h"
-#include "actuators/light/NeoPixelOutput.h"
+#include "actuators/light/LEDOutput.h"
 #include "actuators/light/effects/HorizontalSplit.h"
 
 #ifdef VISIOBALL_BMI270
@@ -50,18 +50,18 @@ MPU9250Sensor sensor(Wire, IMU_ADDRESS);
 
 #ifdef VISIOBALL_BMI270
 #ifdef VISIOBALL_ESP32_S3_DEVKITC1_V11
-Adafruit_NeoPixel strip1(FUSION_LEDS_PER_STRING, LED_PIN_1,
+Adafruit_NeoPixel strip1(ACTIVE_LED_COUNT, LED_PIN_1,
                          NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel strip2(FUSION_LEDS_PER_STRING, LED_PIN_2,
                          NEO_GRB + NEO_KHZ800);
-NeoPixelOutput lightOutput(strip1, strip2, FUSION_LEDS_PER_STRING);
+LEDOutput lightOutput(strip1, strip2, FUSION_LEDS_PER_STRING);
 #else
 Adafruit_NeoPixel strip(ACTIVE_LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
-NeoPixelOutput lightOutput(strip);
+LEDOutput lightOutput(strip);
 #endif
 #else
 Adafruit_NeoPixel strip(ACTIVE_LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
-NeoPixelOutput lightOutput(strip);
+LEDOutput lightOutput(strip);
 #endif
 Orientation orientationEstimate;
 Spatial spatial(orientationEstimate);
@@ -111,7 +111,17 @@ bool updateBall() {
 
 #ifdef VISIOBALL_BMI270
 void updateAudioMotion(const Bmi270AudioSample& sample, uint32_t now) {
-  sound.updateMotion(sample.angularSpeed, sample.roll, sample.pitch);
+  float rollingSpeed = 0.0f;
+  static bool rollingSpeedUnavailable = false;
+  if (!motion.getRollingSpeed(rollingSpeed)) {
+    if (!rollingSpeedUnavailable) {
+      Serial.println("[MOTION] Rolling speed unavailable; WAV playback at normal speed.");
+      rollingSpeedUnavailable = true;
+    }
+  } else {
+    rollingSpeedUnavailable = false;
+  }
+  sound.updateMotion(sample.angularSpeed, sample.roll, sample.pitch, rollingSpeed);
   if (sample.angularSpeed > Config::Motion::STATIONARY_THRESHOLD) {
     lastMotionTime = now;
   } else if (now - lastMotionTime >= 300 && now - lastHeartbeatCycleTime >= 1000) {
@@ -158,6 +168,9 @@ CommunicationProtocol::DeviceStatus deviceStatus() {
   status.audioVolume = static_cast<uint8_t>(roundf(sound.getMasterVolume()));
   status.batteryAvailable = batteryAvailable;
   status.batteryLevel = batteryLevel;
+  const int selectedMode = sound.getEffectIndex();
+  status.audioModeIndex = selectedMode >= 0 ? static_cast<uint8_t>(selectedMode)
+                                          : CommunicationProtocol::NO_AUDIO_MODE;
   return status;
 }
 
@@ -170,7 +183,7 @@ bool initializeAudio() {
     }
   }
   debug.printFileSystemReady(LittleFS.usedBytes(), LittleFS.totalBytes());
-  constexpr char TRACK[] = "/track.wav";
+  constexpr char TRACK[] = "/Hedwigs Theme.wav";
   if (!LittleFS.exists(TRACK)) debug.printMissingAudioTrack(TRACK);
   if (!sound.init(TRACK)) {
     debug.printAudioInitializationFailed();
@@ -210,6 +223,8 @@ void runSystemTask(void*) {
     const uint32_t now = millis();
     if (updateBall()) {
       updateAudioMotion(sensor.audioSample(), now);
+    } else {
+      sound.resetRollingSpeed();
     }
     debug.update();
     vTaskDelay(pdMS_TO_TICKS(5));
@@ -268,6 +283,22 @@ void setup() {
     while (true) delay(1000);
   }
   bleInit("Visioball", deviceStatus());
+  CommunicationProtocol::AudioMode modes[CommunicationProtocol::MAX_AUDIO_MODES];
+  const int modeCount = sound.getEffectCount();
+  if (modeCount > static_cast<int>(CommunicationProtocol::MAX_AUDIO_MODES)) {
+    Serial.println("[SYSTEM] Too many audio modes for BLE catalog");
+    while (true) delay(1000);
+  }
+  for (int i = 0; i < modeCount; ++i) {
+    const SoundEffectType type = sound.getEffectType(i);
+    modes[i] = {static_cast<uint8_t>(i), sound.getEffectName(i),
+                type == SoundEffectType::SoundFont ? "sf2" :
+                type == SoundEffectType::WavDSP ? "wav" : "synth"};
+  }
+  if (!publishAudioCatalog(modes, modeCount)) {
+    Serial.println("[SYSTEM] Cannot publish audio catalog; tasks were not started");
+    while (true) delay(1000);
+  }
   const BaseType_t soundStarted = xTaskCreatePinnedToCore(
       runSoundTask, "SoundDspTask", 16384, nullptr, configMAX_PRIORITIES - 1, nullptr, 1);
   const BaseType_t systemStarted = xTaskCreatePinnedToCore(

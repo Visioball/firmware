@@ -4,11 +4,11 @@
 
 #include "interfaces/ILightOutput.h"
 
-class NeoPixelOutput : public ILightOutput {
+class LEDOutput : public ILightOutput {
 public:
-  explicit NeoPixelOutput(Adafruit_NeoPixel &strip);
-  NeoPixelOutput(Adafruit_NeoPixel &firstStrip, Adafruit_NeoPixel &secondStrip,
-                 size_t firstStripLedCount);
+  explicit LEDOutput(Adafruit_NeoPixel &strip);
+  LEDOutput(Adafruit_NeoPixel &firstStrip, Adafruit_NeoPixel &secondStrip,
+            size_t secondStripStartIndex);
   void clear() override;
   void setBrightness(uint8_t brightness) override;
   void setPixel(size_t index, const Color &color) override;
@@ -17,5 +17,5 @@ public:
 private:
   Adafruit_NeoPixel &strip_;
   Adafruit_NeoPixel *secondStrip_ = nullptr;
-  size_t firstStripLedCount_ = 0;
+  size_t secondStripStartIndex_ = 0;
 };

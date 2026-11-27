@@ -8,7 +8,18 @@ constexpr char SERVICE_UUID[] = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 constexpr char COMMAND_UUID[] = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 constexpr char BATTERY_UUID[] = "a1b2c3d4-1111-2222-3333-abcdefabcdef";
 constexpr char STATUS_UUID[] = "a1b2c3d4-1111-2222-3333-abcdefabcdf0";
-constexpr uint8_t VERSION = 1;
+constexpr char AUDIO_CATALOG_UUID[] = "a1b2c3d4-1111-2222-3333-abcdefabcdf1";
+constexpr uint8_t VERSION = 2;
+constexpr uint8_t AUDIO_CATALOG_VERSION = 1;
+constexpr size_t MAX_AUDIO_MODES = 25;
+constexpr size_t MAX_AUDIO_CATALOG_BYTES = 512;
+constexpr uint8_t NO_AUDIO_MODE = 255;
+
+struct AudioMode {
+    uint8_t index;
+    const char* name;
+    const char* type;
+};
 constexpr uint8_t LIGHT_ENABLED = 1 << 0;
 constexpr uint8_t AUDIO_PLAYING = 1 << 1;
 constexpr uint8_t BATTERY_AVAILABLE = 1 << 2;
@@ -24,15 +35,16 @@ struct DeviceStatus {
     uint8_t lightIntensity = 0;
     uint8_t audioVolume = 0;
     uint8_t batteryLevel = 0;
+    uint8_t audioModeIndex = NO_AUDIO_MODE;
 };
 
-inline std::array<uint8_t, 5> encode(const DeviceStatus& status) {
+inline std::array<uint8_t, 6> encode(const DeviceStatus& status) {
     const uint8_t flags = (status.lightEnabled ? LIGHT_ENABLED : 0) |
                           (status.audioPlaying ? AUDIO_PLAYING : 0) |
                           (status.batteryAvailable ? BATTERY_AVAILABLE : 0) |
                           (status.chargingAvailable ? CHARGING_AVAILABLE : 0) |
                           (status.chargingAvailable && status.charging ? CHARGING : 0);
     return {VERSION, flags, status.lightIntensity, status.audioVolume,
-            status.batteryAvailable ? status.batteryLevel : uint8_t{0}};
+            status.batteryAvailable ? status.batteryLevel : uint8_t{0}, status.audioModeIndex};
 }
 }

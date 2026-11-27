@@ -1,6 +1,5 @@
 #pragma once
 #include <Arduino.h>
-#include <esp_heap_caps.h>
 #include "WavSource.h"
 
 #ifndef M_PI
@@ -60,6 +59,7 @@ public:
     void init(const WavSource* source, float rate) {
         wav = source;
         sampleRate = rate;
+        phase = 0.0f;
         envelope.setSampleRate(rate);
         filterA.setSampleRate(rate);
         filterB.setSampleRate(rate);
@@ -93,65 +93,4 @@ private:
     float phase = 0.0f;
     float pitch = 1.0f;
     float tempo = 1.0f;
-};
-
-class DelayEffect {
-public:
-    ~DelayEffect() { free(buffer); }
-    bool init(float rate, float milliseconds) {
-        size = (size_t)(rate * milliseconds / 1000.0f) + 1024;
-        delaySamples = (size_t)(rate * 300.0f / 1000.0f);
-        buffer = (float*)heap_caps_calloc(size, sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-        if (!buffer) buffer = (float*)calloc(size, sizeof(float));
-        return buffer != nullptr;
-    }
-    void setMix(float value) {
-        mix = constrain(value, 0.0f, 0.70f);
-        feedback = 0.20f + mix * 0.55f;
-    }
-    void process(float* samples, int count) {
-        if (!buffer || mix <= 0.001f) return;
-        for (int i = 0; i < count; i++) {
-            size_t read = (write + size - delaySamples) % size;
-            float echo = buffer[read];
-            buffer[write] = samples[i] + echo * feedback;
-            samples[i] = samples[i] * (1.0f - mix * 0.5f) + echo * mix;
-            write = (write + 1) % size;
-        }
-    }
-
-private:
-    float* buffer = nullptr;
-    size_t size = 0;
-    size_t write = 0;
-    size_t delaySamples = 0;
-    float mix = 0.0f;
-    float feedback = 0.3f;
-};
-
-class BitcrusherEffect {
-public:
-    void setIntensity(float value) {
-        intensity = constrain(value, 0.0f, 1.0f);
-        bits = 16.0f - intensity * 13.0f;
-        downsample = 1 + (int)(intensity * 11.0f);
-    }
-    void process(float* samples, int count) {
-        if (intensity <= 0.005f) return;
-        float steps = powf(2.0f, bits - 1.0f);
-        for (int i = 0; i < count; i++) {
-            if (holdCounter++ >= downsample) {
-                holdCounter = 0;
-                heldSample = roundf(samples[i] * steps) / steps;
-            }
-            samples[i] = heldSample;
-        }
-    }
-
-private:
-    float intensity = 0.0f;
-    float bits = 16.0f;
-    int downsample = 1;
-    int holdCounter = 0;
-    float heldSample = 0.0f;
 };

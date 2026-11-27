@@ -31,6 +31,11 @@ bool Sound::init(const char* wavPath, int blockSize) {
         Serial.println("[SOUND] Unable to load WAV source");
         return false;
     }
+    wavLoaded = true;
+    wavDsp.scanFiles();
+    for (int i = 0; i < wavDsp.count(); ++i) {
+        if (strcmp(wavDsp.path(i), wavPath) == 0) selectedWav = i;
+    }
     stats.sampleRate = wavDsp.sampleRate();
     stats.blockSize = currentBlockSize;
     stats.idealBlockTimeUs = static_cast<int64_t>(currentBlockSize * 1000000.0f / stats.sampleRate);
@@ -45,20 +50,61 @@ int Sound::getSoundFontCount() const { return soundFont.count(); }
 const char* Sound::getSoundFontName(int index) const { return soundFont.name(index); }
 
 bool Sound::selectSoundFontIndex(int index) {
+    if (index < 0 || index >= getSoundFontCount()) return false;
     xSemaphoreTake(effectMutex, portMAX_DELAY);
+    activeEffect = nullptr;
+    currentMode = SoundEffectType::Silent;
+    selectedEffectIndex = -1;
+    wavDsp.unload();
+    wavLoaded = false;
     const bool selected = soundFont.select(index);
+    soundFontLoaded = selected;
+    if (selected) selectedSoundFont = index;
+    else Serial.printf("[SOUND] Failed to load SoundFont: %s\n", soundFont.name(index));
     xSemaphoreGive(effectMutex);
     return selected;
 }
 
+int Sound::getEffectCount() const { return getSoundFontCount() + wavDsp.count() + 1; }
+
+const char* Sound::getEffectName(int index) const {
+    const int count = getSoundFontCount();
+    if (index < 0 || index >= getEffectCount()) return "";
+    if (index < count) return soundFont.name(index);
+    if (index < count + wavDsp.count()) return wavDsp.name(index - count);
+    return "Synth";
+}
+
+SoundEffectType Sound::getEffectType(int index) const {
+    if (index < 0 || index >= getEffectCount()) return SoundEffectType::Silent;
+    if (index < getSoundFontCount()) return SoundEffectType::SoundFont;
+    if (index < getSoundFontCount() + wavDsp.count()) return SoundEffectType::WavDSP;
+    return SoundEffectType::Synth;
+}
+
 bool Sound::selectEffectIndex(int index) {
     const int count = getSoundFontCount();
-    if (index < 0 || index >= count + 2) return false;
+    if (index < 0 || index >= getEffectCount()) return false;
     if (index < count) {
         if (!selectSoundFontIndex(index)) return false;
         setEffectType(SoundEffectType::SoundFont);
+    } else if (index < count + wavDsp.count()) {
+        xSemaphoreTake(effectMutex, portMAX_DELAY);
+        activeEffect = nullptr;
+        currentMode = SoundEffectType::Silent;
+        selectedEffectIndex = -1;
+        soundFont.clear();
+        soundFontLoaded = false;
+        selectedWav = index - count;
+        wavLoaded = wavDsp.initialize(wavDsp.path(selectedWav), stats.sampleRate);
+        if (!wavLoaded) {
+            Serial.printf("[SOUND] Failed to load WAV: %s\n", wavDsp.path(selectedWav));
+        }
+        xSemaphoreGive(effectMutex);
+        if (!wavLoaded) return false;
+        setEffectType(SoundEffectType::WavDSP);
     } else {
-        setEffectType(index == count ? SoundEffectType::WavDSP : SoundEffectType::Synth);
+        setEffectType(SoundEffectType::Synth);
     }
     return true;
 }
@@ -83,9 +129,16 @@ void Sound::triggerMotionInterrupt(int64_t timestamp) {
     if (audioTaskHandle) vTaskNotifyGiveFromISR(audioTaskHandle, nullptr);
 }
 
-void Sound::updateMotion(float movement, float roll, float pitch) {
+void Sound::updateMotion(float movement, float roll, float pitch, float rollingSpeed) {
     xSemaphoreTake(effectMutex, portMAX_DELAY);
+    wavDsp.setRollingSpeed(rollingSpeed);
     if (activeEffect) activeEffect->update(movement, roll, pitch);
+    xSemaphoreGive(effectMutex);
+}
+
+void Sound::resetRollingSpeed() {
+    xSemaphoreTake(effectMutex, portMAX_DELAY);
+    wavDsp.setRollingSpeed(0.0f);
     xSemaphoreGive(effectMutex);
 }
 
@@ -129,6 +182,12 @@ void Sound::setEffect(ISoundEffect& effect) {
     xSemaphoreTake(effectMutex, portMAX_DELAY);
     activeEffect = &effect;
     currentMode = effect.type();
+    switch (effect.type()) {
+    case SoundEffectType::SoundFont: selectedEffectIndex = selectedSoundFont; break;
+    case SoundEffectType::WavDSP: selectedEffectIndex = getSoundFontCount() + selectedWav; break;
+    case SoundEffectType::Synth: selectedEffectIndex = getEffectCount() - 1; break;
+    default: selectedEffectIndex = -1; break;
+    }
     effect.start();
     xSemaphoreGive(effectMutex);
     resetLatencyMax();
@@ -136,14 +195,29 @@ void Sound::setEffect(ISoundEffect& effect) {
 
 void Sound::setEffectType(SoundEffectType type) {
     switch (type) {
-    case SoundEffectType::SoundFont: setEffect(soundFont); break;
-    case SoundEffectType::WavDSP: setEffect(wavDsp); break;
+    case SoundEffectType::SoundFont:
+        if (!soundFontLoaded && !selectSoundFontIndex(selectedSoundFont >= 0 ? selectedSoundFont : 0)) {
+            Serial.println("[SOUND] SoundFont selection failed");
+            break;
+        }
+        setEffect(soundFont);
+        break;
+    case SoundEffectType::WavDSP:
+        if (!wavLoaded) {
+            if (!selectEffectIndex(getSoundFontCount() + selectedWav)) {
+                Serial.println("[SOUND] WAV selection failed");
+            }
+        } else {
+            setEffect(wavDsp);
+        }
+        break;
     case SoundEffectType::Synth: setEffect(synth); break;
     case SoundEffectType::Beep: setEffect(beep); break;
     case SoundEffectType::Silent:
         xSemaphoreTake(effectMutex, portMAX_DELAY);
         activeEffect = nullptr;
         currentMode = type;
+        selectedEffectIndex = -1;
         xSemaphoreGive(effectMutex);
         resetLatencyMax();
         break;

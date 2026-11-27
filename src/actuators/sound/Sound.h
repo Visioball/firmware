@@ -48,6 +48,10 @@ public:
     const char* getSoundFontName(int index) const;
     bool selectSoundFontIndex(int index);
     bool selectEffectIndex(int index);
+    int getEffectCount() const;
+    const char* getEffectName(int index) const;
+    SoundEffectType getEffectType(int index) const;
+    int getEffectIndex() const { return selectedEffectIndex; }
 
     void setBlockSize(int newBlockSize);
     void triggerMotionInterrupt(int64_t isrTimestamp);
@@ -58,7 +62,8 @@ public:
 
     void setMasterVolume(float volumePercent);
     float getMasterVolume() const;
-    void updateMotion(float movement, float roll, float pitch);
+    void updateMotion(float movement, float roll, float pitch, float rollingSpeed);
+    void resetRollingSpeed();
     void triggerHeartbeat(float intensity = 0.5f);
     bool update() override;
     void setEnabled(bool enabled) override { this->enabled = enabled; }
@@ -86,6 +91,11 @@ private:
     std::atomic<int> currentBlockSize;
     float* blockBuffer;
     std::atomic<SoundEffectType> currentMode;
+    std::atomic<int> selectedEffectIndex{-1};
+    int selectedSoundFont = -1;
+    bool soundFontLoaded = false;
+    int selectedWav = 0;
+    bool wavLoaded = false;
     std::atomic<float> masterVolume;
     std::atomic<bool> enabled{true};
 

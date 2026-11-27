@@ -9,12 +9,14 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <ArduinoJson.h>
 
 static BLEServer* bleServer = nullptr;
 static BLECharacteristic* mainChar = nullptr;
 static BLECharacteristic* batChar = nullptr;
 static BLECharacteristic* statusChar = nullptr;
-static std::array<uint8_t, 5> lastStatus{};
+static BLECharacteristic* audioCatalogChar = nullptr;
+static std::array<uint8_t, 6> lastStatus{};
 static float receivedVolume = 5.0f;
 
 namespace {
@@ -144,7 +146,8 @@ class CharCallbacks : public BLECharacteristicCallbacks {
             const char* number = value.c_str() + 5;
             char* end = nullptr;
             long modeIndex = std::strtol(number, &end, 10);
-            if (end == number || *end != '\0' || modeIndex < 0 || modeIndex > 17) {
+            if (end == number || *end != '\0' || modeIndex < 0 ||
+                modeIndex >= static_cast<long>(CommunicationProtocol::MAX_AUDIO_MODES)) {
                 Serial.println("[BLE] Invalid audio mode");
                 return;
             }
@@ -214,6 +217,30 @@ void publishDeviceStatus(const CommunicationProtocol::DeviceStatus& status) {
     if (bleClientConnected()) statusChar->notify();
 }
 
+bool publishAudioCatalog(const CommunicationProtocol::AudioMode* modes, size_t count) {
+    if (!audioCatalogChar || !modes || count > CommunicationProtocol::MAX_AUDIO_MODES) {
+        Serial.println("[BLE] Audio catalog unavailable or too large");
+        return false;
+    }
+    JsonDocument document;
+    document["version"] = CommunicationProtocol::AUDIO_CATALOG_VERSION;
+    JsonArray list = document["modes"].to<JsonArray>();
+    for (size_t i = 0; i < count; ++i) {
+        JsonObject entry = list.add<JsonObject>();
+        entry["index"] = modes[i].index;
+        entry["name"] = modes[i].name;
+        entry["type"] = modes[i].type;
+    }
+    if (measureJson(document) > CommunicationProtocol::MAX_AUDIO_CATALOG_BYTES) {
+        Serial.println("[BLE] Audio catalog exceeds 512 bytes");
+        return false;
+    }
+    String json;
+    serializeJson(document, json);
+    audioCatalogChar->setValue(json);
+    return true;
+}
+
 void bleInit(const char* name, const CommunicationProtocol::DeviceStatus& initialStatus) {
     configurationQueue = xQueueCreate(8, sizeof(ConfigurationUpdate));
     if (!configurationQueue) {
@@ -240,6 +267,10 @@ void bleInit(const char* name, const CommunicationProtocol::DeviceStatus& initia
     statusChar = service->createCharacteristic(
         CommunicationProtocol::STATUS_UUID,
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
+    );
+    audioCatalogChar = service->createCharacteristic(
+        CommunicationProtocol::AUDIO_CATALOG_UUID,
+        BLECharacteristic::PROPERTY_READ
     );
     publishDeviceStatus(initialStatus);
 

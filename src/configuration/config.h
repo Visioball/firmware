@@ -10,7 +10,7 @@ namespace Config {
     namespace Pins {
 #if defined(VISIOBALL_ESP32_S3_DEVKITC1_V11)
         constexpr uint8_t LED_DATA_1   = 40;
-        constexpr uint8_t LED_DATA_2   = 41;
+        constexpr uint8_t LED_DATA_2   = 39;
 
         // MAX98357A I2S amplifier
         constexpr uint8_t MAX98357_SD  = 4;
@@ -54,9 +54,7 @@ namespace Config {
         constexpr int   DEFAULT_BLOCK_SIZE = 128;   // 128 or 256 samples
         constexpr int   SAMPLE_RATE     = 44100;
         constexpr int   NUM_VOICES      = 8;
-        constexpr float DELAY_TIME_MS   = 500.0f;
-        constexpr float DELAY_FEEDBACK  = 0.45f;
-        constexpr float DELAY_MIX       = 0.35f;
+        constexpr float WAV_MAX_ROLLING_SPEED = 24.0f; // rad/s: 3 m/s at 12.5 cm radius
     }
 
     namespace Light {

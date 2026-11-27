@@ -20,10 +20,7 @@
     "maxVolume": 100,
     "defaultBlockSize": 128,
     "sampleRate": 44100,
-    "numVoices": 8,
-    "delayTimeMs": 500,
-    "delayFeedback": 0.45,
-    "delayMix": 0.35
+    "numVoices": 8
   },
   "light": {
     "ledCount": 18

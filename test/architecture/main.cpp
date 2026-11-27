@@ -6,6 +6,7 @@
 #include "Ball.h"
 #include "actuators/light/Light.h"
 #include "actuators/light/LED.h"
+#include "actuators/light/LEDOutput.h"
 #include "actuators/light/LEDPositions.h"
 #include "actuators/light/effects/LavaGlow.h"
 #include "actuators/light/effects/HorizontalSplit.h"
@@ -81,7 +82,80 @@ public:
   bool succeeds = true;
 };
 
+void testLEDOutput() {
+  Adafruit_NeoPixel first(72);
+  Adafruit_NeoPixel second(36);
+  LEDOutput output(first, second, 36);
+
+  for (size_t i = 0; i < 72; ++i) {
+    const Color color{static_cast<uint8_t>(i + 1), 2, 3, 4};
+    output.setPixel(i, color);
+    const uint32_t expected = first.Color(color.red, color.green, color.blue, color.white);
+    assert(first.pixels[i] == expected);
+    if (i < 36) {
+      assert(second.pixels[i] == 0);
+    } else {
+      assert(second.pixels[i - 36] == expected);
+    }
+  }
+  output.setBrightness(42);
+  output.show();
+  assert(first.brightness == 42 && second.brightness == 42);
+  assert(first.showCount == 1 && second.showCount == 1);
+  output.clear();
+  for (uint32_t pixel : first.pixels) assert(pixel == 0);
+  for (uint32_t pixel : second.pixels) assert(pixel == 0);
+
+  Adafruit_NeoPixel single(72);
+  LEDOutput singleOutput(single);
+  singleOutput.setPixel(71, {1, 2, 3, 4});
+  assert(single.pixels[71] == single.Color(1, 2, 3, 4));
+}
+
+void testRollingSpeed() {
+  FakeMotionSensor sensor;
+  sensor.nextSample.acceleration = {0, 0, 1};
+  sensor.nextSample.gyroscope = {180, 0, 0};
+  Orientation orientation;
+  Motion motion(sensor, orientation);
+  float speed = -1;
+  assert(!motion.getRollingSpeed(speed) && speed == -1);
+  assert(motion.begin());
+  assert(motion.update());
+  assert(motion.getRollingSpeed(speed) && std::fabs(speed - 3.14159265f) < 0.001f);
+
+  sensor.nextSample.gyroscope = {-180, 0, 0};
+  sensor.nextSample.timestampMs = 0;
+  assert(motion.update());
+  assert(motion.getRollingSpeed(speed) && std::fabs(speed - 3.14159265f) < 0.001f);
+
+  sensor.nextSample.gyroscope = {0, 0, 180};
+  sensor.nextSample.timestampMs = 0;
+  for (int i = 0; i < 30; ++i) {
+    sensor.nextSample.timestampMs = 0;
+    assert(motion.update());
+  }
+  assert(motion.getRollingSpeed(speed) && speed < 0.001f);
+
+  sensor.readSucceeds = false;
+  assert(!motion.update());
+  speed = -1;
+  assert(!motion.getRollingSpeed(speed) && speed == -1);
+
+  sensor.readSucceeds = true;
+  sensor.nextSample.acceleration = {1, 0, 0};
+  sensor.nextSample.gyroscope = {180, 0, 0};
+  assert(motion.update());
+  assert(motion.getRollingSpeed(speed) && speed < 0.001f);
+  sensor.nextSample.timestampMs = 0;
+  sensor.nextSample.gyroscope = {0, 180, 0};
+  assert(motion.update());
+  assert(motion.getRollingSpeed(speed) && std::fabs(speed - 0.3f * 3.14159265f) < 0.001f);
+}
+
 int main() {
+  testLEDOutput();
+  testRollingSpeed();
   CommunicationProtocol::DeviceStatus status;
   status.lightEnabled = true;
   status.lightIntensity = 128;
@@ -89,12 +163,14 @@ int main() {
   status.audioVolume = 42;
   status.charging = true;
   auto packet = CommunicationProtocol::encode(status);
-  assert((packet == std::array<uint8_t, 5>{1, 3, 128, 42, 0}));
+  assert((packet == std::array<uint8_t, 6>{2, 3, 128, 42, 0, 255}));
   status.batteryAvailable = true;
   status.batteryLevel = 75;
   status.chargingAvailable = true;
   packet = CommunicationProtocol::encode(status);
-  assert((packet == std::array<uint8_t, 5>{1, 31, 128, 42, 75}));
+  status.audioModeIndex = 4;
+  packet = CommunicationProtocol::encode(status);
+  assert((packet == std::array<uint8_t, 6>{2, 31, 128, 42, 75, 4}));
 
   Energy withoutBatteryMeter;
   uint8_t unavailableLevel = 42;
